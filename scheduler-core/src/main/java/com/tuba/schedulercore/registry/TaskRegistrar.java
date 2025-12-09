@@ -1,6 +1,7 @@
 package com.tuba.schedulercore.registry;
 
-import com.tuba.schedulercore.annotation.ScheduledTask;
+import com.tuba.schedulercore.annotation.TubaTask;
+import com.tuba.schedulercore.enums.TimeUnit;
 import com.tuba.schedulercore.model.TaskDefinition;
 import com.tuba.schedulercore.scheduler.Scheduler;
 import org.slf4j.Logger;
@@ -50,7 +51,7 @@ public class TaskRegistrar implements ApplicationContextAware {
                 Class<?> targetClass = AopUtils.getTargetClass(bean);
                 Method[] methods = targetClass.getDeclaredMethods();
                 for (Method m : methods) {
-                    ScheduledTask ann = AnnotationUtils.findAnnotation(m, ScheduledTask.class);
+                    TubaTask ann = AnnotationUtils.findAnnotation(m, TubaTask.class);
                     if (ann != null) {
                         registerMethod(bean, m, ann, targetClass);
                         registeredCount++;
@@ -75,7 +76,7 @@ public class TaskRegistrar implements ApplicationContextAware {
      * @param ann         注解
      * @param targetClass 原始类（非代理类）
      */
-    private void registerMethod(Object bean, Method method, ScheduledTask ann, Class<?> targetClass) {
+    private void registerMethod(Object bean, Method method, TubaTask ann, Class<?> targetClass) {
         if (bean == null || method == null || ann == null || targetClass == null) {
             log.warn("Cannot register method with null parameters: bean={}, method={}, ann={}, targetClass={}",
                     bean, method, ann, targetClass);
@@ -133,8 +134,8 @@ public class TaskRegistrar implements ApplicationContextAware {
      * @param ann 注解实例
      * @param def 任务定义
      */
-    private void parseTimeConfiguration(ScheduledTask ann, TaskDefinition def) {
-        // 优先级：cron > fixedRate/fixedDelay > seconds/minutes/hours/days
+    private void parseTimeConfiguration(TubaTask ann, TaskDefinition def) {
+        // 优先级：cron > interval+type
 
         // 1. 检查 cron 表达式
         String cron = ann.cron().trim();
@@ -144,33 +145,14 @@ public class TaskRegistrar implements ApplicationContextAware {
             return;
         }
 
-        // 2. 检查 fixedRate
-        long fixedRate = ann.fixedRate();
-        if (fixedRate > 0) {
-            def.setFixedRate(fixedRate);
-            log.debug("Task {} uses fixed rate: {}ms", def.getName(), fixedRate);
-            return;
-        }
-
-        // 3. 检查 fixedDelay
-        long fixedDelay = ann.fixedDelay();
-        if (fixedDelay > 0) {
-            def.setFixedDelay(fixedDelay);
-            log.debug("Task {} uses fixed delay: {}ms", def.getName(), fixedDelay);
-            return;
-        }
-
-        // 4. 检查简化时间配置（seconds/minutes/hours/days）
-        String seconds = ann.seconds().trim();
-        String minutes = ann.minutes().trim();
-        String hours = ann.hours().trim();
-        String days = ann.days().trim();
-
-        // 生成 cron 表达式
-        String generatedCron = generateCronExpression(seconds, minutes, hours, days);
-        if (StringUtils.hasText(generatedCron)) {
-            def.setCron(generatedCron);
-            log.debug("Task {} uses generated cron expression: {}", def.getName(), generatedCron);
+        // 2. 检查 interval
+        long interval = ann.interval();
+        if (interval > 0) {
+            // 根据时间单位转换为毫秒
+            long millisInterval = convertToMillis(interval, ann.type());
+            def.setFixedRate(millisInterval);
+            log.debug("Task {} uses interval: {} {} ({}ms)", def.getName(), interval, ann.type().name(),
+                    millisInterval);
             return;
         }
 
@@ -178,55 +160,26 @@ public class TaskRegistrar implements ApplicationContextAware {
     }
 
     /**
-     * 根据简化的时间配置生成 Cron 表达式
+     * 将时间间隔转换为毫秒
      * 
-     * @param seconds 秒级配置
-     * @param minutes 分钟级配置
-     * @param hours   小时级配置
-     * @param days    天级配置
-     * @return Cron 表达式
+     * @param interval 时间间隔
+     * @param timeUnit 时间单位
+     * @return 毫秒数
      */
-    private String generateCronExpression(String seconds, String minutes, String hours, String days) {
-        // 默认值：每秒执行
-        String sec = StringUtils.hasText(seconds) ? seconds : "*";
-        String min = StringUtils.hasText(minutes) ? minutes : "*";
-        String hour = StringUtils.hasText(hours) ? hours : "*";
-        String day = StringUtils.hasText(days) ? days : "*";
-
-        // 如果是简单的数字，表示间隔执行
-        if (isSimpleNumber(seconds)) {
-            // 每 N 秒执行一次
-            sec = "*/" + seconds;
+    private long convertToMillis(long interval, TimeUnit timeUnit) {
+        switch (timeUnit) {
+            case SECONDS:
+                return interval * 1000;
+            case MINUTES:
+                return interval * 1000 * 60;
+            case HOURS:
+                return interval * 1000 * 60 * 60;
+            case DAYS:
+                return interval * 1000 * 60 * 60 * 24;
+            case MILLISECONDS:
+            default:
+                return interval;
         }
-        if (isSimpleNumber(minutes)) {
-            // 每 N 分钟执行一次
-            min = "*/" + minutes;
-        }
-        if (isSimpleNumber(hours)) {
-            // 每 N 小时执行一次
-            hour = "*/" + hours;
-        }
-        if (isSimpleNumber(days)) {
-            // 每 N 天执行一次
-            day = "*/" + days;
-        }
-
-        // 生成 Cron 表达式：秒 分 时 日 月 周 年（年可选）
-        return String.format("%s %s %s %s * ?", sec, min, hour, day);
-    }
-
-    /**
-     * 判断字符串是否是简单数字
-     * 
-     * @param str 字符串
-     * @return 是否是简单数字
-     */
-    private boolean isSimpleNumber(String str) {
-        if (!StringUtils.hasText(str)) {
-            return false;
-        }
-        // 检查是否只包含数字
-        return str.matches("^\\d+$");
     }
 
     @Override

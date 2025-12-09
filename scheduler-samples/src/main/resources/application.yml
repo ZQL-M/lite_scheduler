@@ -19,7 +19,6 @@ logging:
     com.tuba: DEBUG
     org.springframework: INFO
     org.springframework.jdbc: DEBUG
-
 # 应用配置
 server:
   port: 8080
