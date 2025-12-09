@@ -1,0 +1,22 @@
+# 应用配置
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/lite_scheduler?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&createDatabaseIfNotExist=true
+    username: root
+    password: 256430
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+# Lite-Scheduler 配置
+lite-scheduler:
+  executor:
+    pool-size: 10
+    scheduler-pool-size: 5
+    thread-name-prefix: "lite-scheduler-"
+  persistence:
+    type: database  # database 或 memory
