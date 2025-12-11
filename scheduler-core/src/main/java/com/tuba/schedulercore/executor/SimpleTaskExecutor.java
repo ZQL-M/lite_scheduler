@@ -1,9 +1,11 @@
 package com.tuba.schedulercore.executor;
 
 import com.tuba.schedulercore.config.ExecutorProperties;
+import com.tuba.schedulercore.log.TaskLogService;
 import com.tuba.schedulercore.model.TaskContext;
 import com.tuba.schedulercore.model.TaskDefinition;
 import com.tuba.schedulercore.model.TaskLog;
+import com.tuba.schedulercore.persistence.TaskPersistenceService;
 import com.tuba.schedulercore.plugin.PluginManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,10 +32,30 @@ public class SimpleTaskExecutor implements TaskExecutor, DisposableBean {
 
     private final PluginManager pluginManager;
     private final ExecutorService executor;
+    private final TaskLogService taskLogService;
+    private final TaskPersistenceService persistenceService;
 
+    /**
+     * 生产环境构造函数
+     */
     @Autowired(required = false)
+    public SimpleTaskExecutor(PluginManager pluginManager, ExecutorProperties properties,
+            TaskLogService taskLogService, TaskPersistenceService persistenceService) {
+        this.pluginManager = pluginManager;
+        this.taskLogService = taskLogService;
+        this.persistenceService = persistenceService;
+        int poolSize = properties != null ? properties.getPoolSize() : Runtime.getRuntime().availableProcessors();
+        this.executor = Executors.newFixedThreadPool(poolSize);
+        log.info("SimpleTaskExecutor initialized with pool size: {}", poolSize);
+    }
+
+    /**
+     * 测试专用构造函数
+     */
     public SimpleTaskExecutor(PluginManager pluginManager, ExecutorProperties properties) {
         this.pluginManager = pluginManager;
+        this.taskLogService = null;
+        this.persistenceService = null;
         int poolSize = properties != null ? properties.getPoolSize() : Runtime.getRuntime().availableProcessors();
         this.executor = Executors.newFixedThreadPool(poolSize);
         log.info("SimpleTaskExecutor initialized with pool size: {}", poolSize);
@@ -58,45 +80,50 @@ public class SimpleTaskExecutor implements TaskExecutor, DisposableBean {
     }
 
     private void invokeAndHandle(TaskContext context) {
-        context.setStartTime(Instant.now());
-        pluginManager.before(context);
+        TaskDefinition definition = context.getDefinition();
 
-        TaskLog taskLog = createTaskLog(context);
-        Throwable error = null;
+        // 记录任务开始执行
+        TaskLog taskLog = null;
+        if (taskLogService != null) {
+            taskLog = taskLogService.recordTaskStart(context);
+        }
 
         try {
+            context.setStartTime(Instant.now());
+            pluginManager.before(context);
+
             invokeMethod(context);
+
             context.setEndTime(Instant.now());
-            taskLog.setStatus("SUCCESS");
+
+            // 更新任务定义的lastFireTime
+            if (definition.isPersistent() && persistenceService != null && persistenceService.isAvailable()) {
+                definition.setLastFireTime(java.time.LocalDateTime.now());
+                persistenceService.update(definition);
+            }
+
+            // 记录任务执行成功
+            if (taskLogService != null && taskLog != null) {
+                taskLogService.recordTaskSuccess(context, taskLog);
+            }
             pluginManager.after(context);
         } catch (Throwable e) {
             context.setEndTime(Instant.now());
-            error = extractActualError(e);
+            Throwable error = extractActualError(e);
             context.setError(error);
-            taskLog.setStatus("FAIL");
-            taskLog.setMessage(error.getMessage());
+
+            // 更新任务定义
+            if (definition.isPersistent() && persistenceService != null && persistenceService.isAvailable()) {
+                definition.setLastFireTime(java.time.LocalDateTime.now());
+                persistenceService.update(definition);
+            }
+
+            // 记录任务执行失败
+            if (taskLogService != null && taskLog != null) {
+                taskLogService.recordTaskFailure(context, taskLog, error);
+            }
             pluginManager.onError(context, error);
-        } finally {
-            // 统一设置日志时间
-            taskLog.setStartTime(context.getStartTime());
-            taskLog.setEndTime(context.getEndTime());
-            taskLog.setDurationMs(calculateDuration(context));
-
         }
-    }
-
-    /**
-     * 创建任务日志对象
-     */
-    private TaskLog createTaskLog(TaskContext context) {
-        TaskLog taskLog = new TaskLog();
-        taskLog.setId(java.util.UUID.randomUUID().toString());
-        taskLog.setTaskId(context.getDefinition().getId());
-        TaskDefinition def = context.getDefinition();
-        if (def != null) {
-            taskLog.setTaskName(def.getName());
-        }
-        return taskLog;
     }
 
     /**
@@ -108,16 +135,6 @@ public class SimpleTaskExecutor implements TaskExecutor, DisposableBean {
             return cause != null ? cause : e;
         }
         return e;
-    }
-
-    /**
-     * 计算任务执行时长（毫秒）
-     */
-    private long calculateDuration(TaskContext context) {
-        if (context.getStartTime() != null && context.getEndTime() != null) {
-            return context.getEndTime().toEpochMilli() - context.getStartTime().toEpochMilli();
-        }
-        return 0;
     }
 
     /**

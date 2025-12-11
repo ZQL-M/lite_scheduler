@@ -1,36 +1,73 @@
 package com.tuba.schedulercore.model;
 
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import com.tuba.schedulercore.plugin.TaskPlugin;
 
 import java.lang.reflect.Method;
-import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
+
+import lombok.Data;
 
 /**
  * 任务定义，包含任务的元数据和执行信息
  */
+@Data
+@TableName("task_definition")
 public class TaskDefinition {
+    @TableId(type = IdType.ASSIGN_UUID)
     private String id;
+
     private String name;
+
+    @TableField("group_name")
     private String group = "default";
+
     private String cron;
+
+    @TableField("fixed_rate")
     private long fixedRate = -1; // 固定频率，单位毫秒
+
+    @TableField("fixed_delay")
     private long fixedDelay = -1; // 固定延迟，单位毫秒
+
     private boolean async = true;
+
+    @TableField(exist = false)
     private Object bean;
+
+    @TableField(exist = false)
     private Method method;
+
+    @TableField("bean_name")
     private String beanName; // Spring Bean名称（用于数据库恢复）
+
+    @TableField("method_name")
     private String methodName; // 方法名（用于数据库恢复）
+
     private String description;
+
     private boolean enabled = true; // 任务是否启用
+
     private boolean persistent = false; // 是否持久化
+
+    @TableField("repeat_count")
     private int repeatCount = -1; // 循环次数，-1表示无限循环
-    private Instant lastFireTime; // 上次触发时间
-    private Instant nextFireTime; // 下次触发时间
+
+    @TableField("last_fire_time")
+    private LocalDateTime lastFireTime; // 上次触发时间
+
+    @TableField("next_fire_time")
+    private LocalDateTime nextFireTime; // 下次触发时间
+
+    @TableField(exist = false)
     private List<TaskPlugin> plugins;
 
-    // constructors, getters, setters
+    // constructors
 
     public TaskDefinition() {
     }
@@ -46,152 +83,6 @@ public class TaskDefinition {
         this.method = method;
         this.description = description;
         this.enabled = true;
-    }
-
-    // getters / setters
-
-    public String getId() {
-        return id;
-    }
-
-    public void setId(String id) {
-        this.id = id;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getGroup() {
-        return group;
-    }
-
-    public void setGroup(String group) {
-        this.group = group;
-    }
-
-    public String getCron() {
-        return cron;
-    }
-
-    public void setCron(String cron) {
-        this.cron = cron;
-    }
-
-    public boolean isAsync() {
-        return async;
-    }
-
-    public void setAsync(boolean async) {
-        this.async = async;
-    }
-
-    public Object getBean() {
-        return bean;
-    }
-
-    public void setBean(Object bean) {
-        this.bean = bean;
-    }
-
-    public Method getMethod() {
-        return method;
-    }
-
-    public void setMethod(Method method) {
-        this.method = method;
-    }
-
-    public List<TaskPlugin> getPlugins() {
-        return plugins;
-    }
-
-    public void setPlugins(List<TaskPlugin> plugins) {
-        this.plugins = plugins;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public boolean isEnabled() {
-        return enabled;
-    }
-
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
-    }
-
-    public long getFixedRate() {
-        return fixedRate;
-    }
-
-    public void setFixedRate(long fixedRate) {
-        this.fixedRate = fixedRate;
-    }
-
-    public long getFixedDelay() {
-        return fixedDelay;
-    }
-
-    public void setFixedDelay(long fixedDelay) {
-        this.fixedDelay = fixedDelay;
-    }
-
-    public boolean isPersistent() {
-        return persistent;
-    }
-
-    public void setPersistent(boolean persistent) {
-        this.persistent = persistent;
-    }
-
-    public int getRepeatCount() {
-        return repeatCount;
-    }
-
-    public void setRepeatCount(int repeatCount) {
-        this.repeatCount = repeatCount;
-    }
-
-    public Instant getLastFireTime() {
-        return lastFireTime;
-    }
-
-    public void setLastFireTime(Instant lastFireTime) {
-        this.lastFireTime = lastFireTime;
-    }
-
-    public Instant getNextFireTime() {
-        return nextFireTime;
-    }
-
-    public void setNextFireTime(Instant nextFireTime) {
-        this.nextFireTime = nextFireTime;
-    }
-
-    public String getBeanName() {
-        return beanName;
-    }
-
-    public void setBeanName(String beanName) {
-        this.beanName = beanName;
-    }
-
-    public String getMethodName() {
-        return methodName;
-    }
-
-    public void setMethodName(String methodName) {
-        this.methodName = methodName;
     }
 
     /**

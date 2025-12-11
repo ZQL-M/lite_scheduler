@@ -15,6 +15,7 @@ import org.springframework.scheduling.support.PeriodicTrigger;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
@@ -75,7 +76,7 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
         Runnable runnable = () -> {
             // 更新任务的last_fire_time为当前时间
             Instant now = Instant.now();
-            definition.setLastFireTime(now);
+            definition.setLastFireTime(LocalDateTime.ofInstant(now, java.time.ZoneId.systemDefault()));
             
             // 执行任务
             TaskContext ctx = new TaskContext(definition);

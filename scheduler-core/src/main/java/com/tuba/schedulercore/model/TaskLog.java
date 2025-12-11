@@ -1,88 +1,45 @@
 package com.tuba.schedulercore.model;
 
-import java.time.Instant;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 
+import java.time.LocalDateTime;
+
+import lombok.Data;
+
+/**
+ * 任务执行日志实体
+ */
+@Data
+@TableName("task_execution_log")
 public class TaskLog {
+    @TableId(type = IdType.ASSIGN_UUID)
     private String id;
+
+    @TableField("task_id")
     private String taskId;
+
+    @TableField("task_name")
     private String taskName;
-    private Instant startTime;
-    private Instant endTime;
-    private String status; // SUCCESS / FAIL
-    private String message;
-    private String errorStack;
+
+    @TableField("start_time")
+    private LocalDateTime startTime;
+
+    @TableField("end_time")
+    private LocalDateTime endTime;
+
+    @TableField("duration_ms")
     private Long durationMs;
 
-    // getters/setters
-    public String getId() {
-        return id;
-    }
+    private String status;
 
-    public void setId(String id) {
-        this.id = id;
-    }
+    @TableField("error_message")
+    private String errorMessage;
 
-    public String getTaskId() {
-        return taskId;
-    }
+    private String exception;
 
-    public void setTaskId(String taskId) {
-        this.taskId = taskId;
-    }
-
-    public String getTaskName() {
-        return taskName;
-    }
-
-    public void setTaskName(String taskName) {
-        this.taskName = taskName;
-    }
-
-    public Instant getStartTime() {
-        return startTime;
-    }
-
-    public void setStartTime(Instant startTime) {
-        this.startTime = startTime;
-    }
-
-    public Instant getEndTime() {
-        return endTime;
-    }
-
-    public void setEndTime(Instant endTime) {
-        this.endTime = endTime;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
-    public String getMessage() {
-        return message;
-    }
-
-    public void setMessage(String message) {
-        this.message = message;
-    }
-
-    public String getErrorStack() {
-        return errorStack;
-    }
-
-    public void setErrorStack(String errorStack) {
-        this.errorStack = errorStack;
-    }
-
-    public Long getDurationMs() {
-        return durationMs;
-    }
-
-    public void setDurationMs(Long durationMs) {
-        this.durationMs = durationMs;
-    }
+    @TableField("created_time")
+    private LocalDateTime createdTime;
 }
