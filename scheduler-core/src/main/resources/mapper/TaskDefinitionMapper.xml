@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tuba.schedulercore.mapper.TaskDefinitionMapper">
+    <select id="selectEnabledTasks" resultType="com.tuba.schedulercore.model.TaskDefinition">
+        SELECT * FROM task_definition WHERE enabled = 1
+    </select>
+    
+    <select id="selectByGroup" resultType="com.tuba.schedulercore.model.TaskDefinition">
+        SELECT * FROM task_definition WHERE group_name = #{groupName}
+    </select>
+</mapper>

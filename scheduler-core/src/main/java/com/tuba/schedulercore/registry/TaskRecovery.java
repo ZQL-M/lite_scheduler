@@ -10,6 +10,7 @@ import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
+import javax.annotation.Resource;
 import java.util.List;
 
 /**
@@ -31,8 +32,7 @@ public class TaskRecovery {
 
     /**
      * 当Spring容器初始化完成后调用，从数据库加载并恢复任务
-     * 
-     * @param event 上下文刷新事件
+     *
      */
     @EventListener(ContextRefreshedEvent.class)
     public void recoverTasks() {

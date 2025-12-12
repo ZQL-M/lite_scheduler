@@ -22,7 +22,6 @@ public class ProgrammaticTaskConfig {
     
     /**
      * 当Spring容器初始化完成后，注册示例任务
-     * @param event 上下文刷新事件
      */
     @EventListener(ContextRefreshedEvent.class)
     public void registerSampleTasks() {

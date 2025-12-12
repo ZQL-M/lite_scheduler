@@ -18,15 +18,15 @@ public class DemoTask {
      * 示例1：最简单的使用 - 默认异步，每10秒执行一次
      * 使用默认值：异步执行，毫秒级（未指定type时默认）
      */
-    @TubaTask(
-            name = "最简单的任务",
-            interval = 10000,
-            // repeatCount = 3,
-            description = "每10秒执行一次，使用默认异步执行"
-    )
-    public void simpleTask() {
-        System.out.println("[最简单的任务] 执行时间: " + LocalDateTime.now() + ", 线程: " + Thread.currentThread().getName());
-    }
+    // @TubaTask(
+    //         name = "最简单的任务",
+    //         interval = 10000,
+    //         // repeatCount = 3,
+    //         description = "每10秒执行一次，使用默认异步执行"
+    // )
+    // public void simpleTask() {
+    //     System.out.println("[最简单的任务] 执行时间: " + LocalDateTime.now() + ", 线程: " + Thread.currentThread().getName());
+    // }
 
     // /**
     //  * 示例2：使用TimeUnit.SECONDS - 每5秒执行一次
