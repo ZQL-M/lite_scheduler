@@ -74,34 +74,46 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
 
         // create a runnable that will submit to executor
         Runnable runnable = () -> {
-            // 更新任务的last_fire_time为当前时间
-            Instant now = Instant.now();
-            definition.setLastFireTime(LocalDateTime.ofInstant(now, java.time.ZoneId.systemDefault()));
-            
-            // 执行任务
-            TaskContext ctx = new TaskContext(definition);
-            taskExecutor.execute(ctx);
+            // 确保同一个任务在同一时间只有一个实例在执行
+            synchronized (this) {
+                // 检查任务是否被取消
+                if (!scheduledFutures.containsKey(definition.getId())) {
+                    log.debug("Task {} has been unscheduled, skipping execution", definition.getId());
+                    return;
+                }
 
-            // 更新执行次数
-            int currentCount = taskExecutionCounts.computeIfPresent(definition.getId(), (key, count) -> count + 1);
+                // 更新任务的last_fire_time为当前时间
+                Instant now = Instant.now();
+                LocalDateTime lastFireTime = LocalDateTime.ofInstant(now, java.time.ZoneId.systemDefault());
+                definition.setLastFireTime(lastFireTime);
 
-            // 检查是否达到最大执行次数
-            int repeatCount = definition.getRepeatCount();
-            if (repeatCount > -1) { // -1表示无限循环
-                // 更新任务的repeat_count（如果是持久化任务）
-                int remainingCount = repeatCount - currentCount;
-                definition.setRepeatCount(Math.max(0, remainingCount));
-                
-                if (currentCount >= repeatCount) {
-                    log.info(
-                            "Task {} has reached maximum execution count of {} (executed {} times). Unscheduling task.",
-                            definition.getId(), repeatCount, currentCount);
-                    unschedule(definition.getId());
-                    taskExecutionCounts.remove(definition.getId());
+                // 计算下次触发时间
+                LocalDateTime nextFireTime = calculateNextFireTime(definition, lastFireTime);
+                definition.setNextFireTime(nextFireTime);
+
+                // 执行任务
+                TaskContext ctx = new TaskContext(definition);
+                taskExecutor.execute(ctx);
+
+                // 更新执行次数
+                int currentCount = taskExecutionCounts.computeIfPresent(definition.getId(), (key, count) -> count + 1);
+
+                // 检查是否达到最大执行次数
+                int repeatCount = definition.getRepeatCount();
+                if (repeatCount > -1) { // -1表示无限循环
+                    // 更新任务的repeat_count
+                    int remainingCount = repeatCount - currentCount;
+                    definition.setRepeatCount(Math.max(0, remainingCount));
+
+                    if (currentCount >= repeatCount) {
+                        log.info(
+                                "Task {} has reached maximum execution count of {} (executed {} times). Unscheduling task.",
+                                definition.getId(), repeatCount, currentCount);
+                        unschedule(definition.getId());
+                        taskExecutionCounts.remove(definition.getId());
+                    }
                 }
             }
-            
-
         };
 
         ScheduledFuture<?> future;
@@ -218,5 +230,36 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
         // 立即触发任务执行，不加入调度计划
         TaskContext ctx = new TaskContext(definition);
         taskExecutor.execute(ctx);
+    }
+
+    /**
+     * 计算任务的下次触发时间
+     * 
+     * @param definition   任务定义
+     * @param lastFireTime 上次触发时间
+     * @return 下次触发时间
+     */
+    private LocalDateTime calculateNextFireTime(TaskDefinition definition, LocalDateTime lastFireTime) {
+        // 根据不同的调度类型计算下次触发时间
+
+        // 1. 固定频率
+        if (definition.getFixedRate() > 0) {
+            return lastFireTime.plusNanos(definition.getFixedRate() * 1000000);
+        }
+
+        // 2. 固定延迟
+        if (definition.getFixedDelay() > 0) {
+            return lastFireTime.plusNanos(definition.getFixedDelay() * 1000000);
+        }
+
+        // 3. Cron表达式
+        if (definition.getCron() != null && !definition.getCron().isEmpty()) {
+            // 简单实现：对于Cron表达式，这里返回null，由Spring的CronTrigger处理
+            // 实际生产环境中，应该使用CronExpression解析器来计算下次触发时间
+            return null;
+        }
+
+        // 默认返回null
+        return null;
     }
 }

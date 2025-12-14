@@ -1,19 +1,22 @@
 package com.tuba.schedulercore.service.impl;
 
+import com.tuba.schedulercore.config.PersistenceProperties;
 import com.tuba.schedulercore.enums.TimeUnit;
 import com.tuba.schedulercore.model.TaskDefinition;
 import com.tuba.schedulercore.persistence.TaskPersistenceService;
 import com.tuba.schedulercore.registry.TaskRegistry;
 import com.tuba.schedulercore.scheduler.Scheduler;
+import com.tuba.schedulercore.service.TaskSchedulerService;
 import com.tuba.schedulercore.task.Task;
 import com.tuba.schedulercore.task.TaskAdapter;
-import com.tuba.schedulercore.service.TaskSchedulerService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
+import java.util.concurrent.Callable;
 
 /**
  * 任务调度服务实现
@@ -35,7 +38,11 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
     @Autowired
     private TaskPersistenceService persistenceService;
 
+    @Autowired
+    private PersistenceProperties persistenceProperties;
+
     @Override
+    @Transactional
     public String registerTask(Task task, TaskDefinition definition) {
         if (task == null) {
             throw new IllegalArgumentException("Task cannot be null");
@@ -60,9 +67,12 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
         if (definition.getGroup() == null) {
             definition.setGroup("default");
         }
+        // 根据配置自动设置持久化属性
+        if ("database".equalsIgnoreCase(persistenceProperties.getType())) {
+            definition.setPersistent(true);
+        }
         // async是boolean类型，不需要空检查
         // enabled是boolean类型，不需要空检查
-        // persistent是boolean类型，不需要空检查
         // repeatCount是int类型，不需要空检查
 
         // 注册任务到注册表
@@ -115,6 +125,166 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
     }
 
     @Override
+    @Transactional
+    public String registerTask(Runnable runnable, TaskDefinition definition) {
+        if (runnable == null) {
+            throw new IllegalArgumentException("Runnable cannot be null");
+        }
+        if (definition == null) {
+            throw new IllegalArgumentException("TaskDefinition cannot be null");
+        }
+
+        // 如果任务ID为空，生成一个新的UUID
+        if (definition.getId() == null) {
+            definition.setId(UUID.randomUUID().toString());
+        }
+
+        // 设置Runnable实例和方法
+        if (definition.getBean() == null) {
+            TaskDefinition newDefinition = taskAdapter.createTaskDefinition(runnable);
+            definition.setBean(newDefinition.getBean());
+            definition.setMethod(newDefinition.getMethod());
+        }
+
+        // 设置默认值
+        if (definition.getGroup() == null) {
+            definition.setGroup("default");
+        }
+        // 根据配置自动设置持久化属性
+        if ("database".equalsIgnoreCase(persistenceProperties.getType())) {
+            definition.setPersistent(true);
+        }
+
+        // 注册任务到注册表
+        taskRegistry.register(definition);
+
+        // 持久化任务到数据库
+        if (definition.isPersistent()) {
+            persistenceService.save(definition);
+        }
+
+        // 调度任务
+        if (definition.isEnabled()) {
+            scheduler.schedule(definition);
+        }
+
+        log.info("成功注册Runnable任务: {} (ID: {})", definition.getName(), definition.getId());
+        return definition.getId();
+    }
+
+    @Override
+    public String registerTask(Runnable runnable, String cron) {
+        if (cron == null || cron.trim().isEmpty()) {
+            throw new IllegalArgumentException("Cron expression cannot be empty");
+        }
+
+        TaskDefinition definition = new TaskDefinition();
+        definition.setCron(cron);
+        definition.setName(runnable.getClass().getSimpleName() + "-Runnable-Cron");
+
+        return registerTask(runnable, definition);
+    }
+
+    @Override
+    public String registerTask(Runnable runnable, long interval, TimeUnit timeUnit) {
+        if (interval <= 0) {
+            throw new IllegalArgumentException("Interval must be greater than 0");
+        }
+        if (timeUnit == null) {
+            throw new IllegalArgumentException("TimeUnit cannot be null");
+        }
+
+        // 转换为毫秒
+        long millisInterval = convertToMillis(interval, timeUnit);
+
+        TaskDefinition definition = new TaskDefinition();
+        definition.setFixedRate(millisInterval);
+        definition.setName(runnable.getClass().getSimpleName() + "-Runnable-FixedRate");
+
+        return registerTask(runnable, definition);
+    }
+
+    @Override
+    @Transactional
+    public <V> String registerTask(Callable<V> callable, TaskDefinition definition) {
+        if (callable == null) {
+            throw new IllegalArgumentException("Callable cannot be null");
+        }
+        if (definition == null) {
+            throw new IllegalArgumentException("TaskDefinition cannot be null");
+        }
+
+        // 如果任务ID为空，生成一个新的UUID
+        if (definition.getId() == null) {
+            definition.setId(UUID.randomUUID().toString());
+        }
+
+        // 设置Callable实例和方法
+        if (definition.getBean() == null) {
+            TaskDefinition newDefinition = taskAdapter.createTaskDefinition(callable);
+            definition.setBean(newDefinition.getBean());
+            definition.setMethod(newDefinition.getMethod());
+        }
+
+        // 设置默认值
+        if (definition.getGroup() == null) {
+            definition.setGroup("default");
+        }
+        // 根据配置自动设置持久化属性
+        if ("database".equalsIgnoreCase(persistenceProperties.getType())) {
+            definition.setPersistent(true);
+        }
+
+        // 注册任务到注册表
+        taskRegistry.register(definition);
+
+        // 持久化任务到数据库
+        if (definition.isPersistent()) {
+            persistenceService.save(definition);
+        }
+
+        // 调度任务
+        if (definition.isEnabled()) {
+            scheduler.schedule(definition);
+        }
+
+        log.info("成功注册Callable任务: {} (ID: {})", definition.getName(), definition.getId());
+        return definition.getId();
+    }
+
+    @Override
+    public <V> String registerTask(Callable<V> callable, String cron) {
+        if (cron == null || cron.trim().isEmpty()) {
+            throw new IllegalArgumentException("Cron expression cannot be empty");
+        }
+
+        TaskDefinition definition = new TaskDefinition();
+        definition.setCron(cron);
+        definition.setName(callable.getClass().getSimpleName() + "-Callable-Cron");
+
+        return registerTask(callable, definition);
+    }
+
+    @Override
+    public <V> String registerTask(Callable<V> callable, long interval, TimeUnit timeUnit) {
+        if (interval <= 0) {
+            throw new IllegalArgumentException("Interval must be greater than 0");
+        }
+        if (timeUnit == null) {
+            throw new IllegalArgumentException("TimeUnit cannot be null");
+        }
+
+        // 转换为毫秒
+        long millisInterval = convertToMillis(interval, timeUnit);
+
+        TaskDefinition definition = new TaskDefinition();
+        definition.setFixedRate(millisInterval);
+        definition.setName(callable.getClass().getSimpleName() + "-Callable-FixedRate");
+
+        return registerTask(callable, definition);
+    }
+
+    @Override
     public void triggerTask(String taskId) {
         if (taskId == null || taskId.isEmpty()) {
             throw new IllegalArgumentException("Task ID cannot be empty");
@@ -131,6 +301,7 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
     }
 
     @Override
+    @Transactional
     public void pauseTask(String taskId) {
         if (taskId == null || taskId.isEmpty()) {
             throw new IllegalArgumentException("Task ID cannot be empty");
@@ -157,6 +328,7 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
     }
 
     @Override
+    @Transactional
     public void resumeTask(String taskId) {
         if (taskId == null || taskId.isEmpty()) {
             throw new IllegalArgumentException("Task ID cannot be empty");
@@ -183,6 +355,7 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
     }
 
     @Override
+    @Transactional
     public void cancelTask(String taskId) {
         if (taskId == null || taskId.isEmpty()) {
             throw new IllegalArgumentException("Task ID cannot be empty");

@@ -32,11 +32,14 @@ public class TaskRegistrar implements ApplicationContextAware {
     private ApplicationContext applicationContext;
     private final TaskRegistry taskRegistry;
     private final Scheduler scheduler;
+    private final com.tuba.schedulercore.config.PersistenceProperties persistenceProperties;
 
     @Autowired
-    public TaskRegistrar(TaskRegistry taskRegistry, Scheduler scheduler) {
+    public TaskRegistrar(TaskRegistry taskRegistry, Scheduler scheduler,
+            com.tuba.schedulercore.config.PersistenceProperties persistenceProperties) {
         this.taskRegistry = taskRegistry;
         this.scheduler = scheduler;
+        this.persistenceProperties = persistenceProperties;
     }
 
     @EventListener(ContextRefreshedEvent.class)
@@ -112,7 +115,9 @@ public class TaskRegistrar implements ApplicationContextAware {
             def.setMethodName(method.getName());
             def.setDescription(ann.description());
             def.setEnabled(true); // 默认启用
-            def.setPersistent(false); // 注解任务默认非持久化
+            // 根据配置自动设置持久化属性，覆盖注解默认值
+            boolean isDatabasePersistence = "database".equalsIgnoreCase(persistenceProperties.getType());
+            def.setPersistent(isDatabasePersistence || ann.persistent()); // 数据库模式下默认为true，否则使用注解值
             def.setRepeatCount(ann.repeatCount());
 
             // 解析时间配置

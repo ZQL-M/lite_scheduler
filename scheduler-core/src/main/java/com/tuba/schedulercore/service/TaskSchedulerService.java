@@ -4,6 +4,8 @@ import com.tuba.schedulercore.enums.TimeUnit;
 import com.tuba.schedulercore.model.TaskDefinition;
 import com.tuba.schedulercore.task.Task;
 
+import java.util.concurrent.Callable;
+
 /**
  * 任务调度服务接口，提供编程式API用于任务管理
  */
@@ -35,6 +37,62 @@ public interface TaskSchedulerService {
      * @return 任务ID
      */
     String registerTask(Task task, long interval, TimeUnit timeUnit);
+
+    /**
+     * 使用Runnable注册任务
+     * 
+     * @param runnable   Runnable实例
+     * @param definition 任务定义
+     * @return 任务ID
+     */
+    String registerTask(Runnable runnable, TaskDefinition definition);
+
+    /**
+     * 使用Runnable和cron表达式注册任务
+     * 
+     * @param runnable Runnable实例
+     * @param cron     cron表达式
+     * @return 任务ID
+     */
+    String registerTask(Runnable runnable, String cron);
+
+    /**
+     * 使用Runnable和固定频率注册任务
+     * 
+     * @param runnable Runnable实例
+     * @param interval 时间间隔
+     * @param timeUnit 时间单位
+     * @return 任务ID
+     */
+    String registerTask(Runnable runnable, long interval, TimeUnit timeUnit);
+
+    /**
+     * 使用Callable注册任务
+     * 
+     * @param callable   Callable实例
+     * @param definition 任务定义
+     * @return 任务ID
+     */
+    <V> String registerTask(Callable<V> callable, TaskDefinition definition);
+
+    /**
+     * 使用Callable和cron表达式注册任务
+     * 
+     * @param callable Callable实例
+     * @param cron     cron表达式
+     * @return 任务ID
+     */
+    <V> String registerTask(Callable<V> callable, String cron);
+
+    /**
+     * 使用Callable和固定频率注册任务
+     * 
+     * @param callable Callable实例
+     * @param interval 时间间隔
+     * @param timeUnit 时间单位
+     * @return 任务ID
+     */
+    <V> String registerTask(Callable<V> callable, long interval, TimeUnit timeUnit);
 
     /**
      * 触发任务立即执行
