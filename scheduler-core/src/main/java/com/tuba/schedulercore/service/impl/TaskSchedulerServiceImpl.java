@@ -26,20 +26,27 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
 
     private static final Logger log = LoggerFactory.getLogger(TaskSchedulerServiceImpl.class);
 
-    @Autowired
-    private TaskAdapter taskAdapter;
+    private final TaskAdapter taskAdapter;
+    private final TaskRegistry taskRegistry;
+    private final Scheduler scheduler;
+    private final TaskPersistenceService persistenceService;
+    private final PersistenceProperties persistenceProperties;
 
     @Autowired
-    private TaskRegistry taskRegistry;
-
-    @Autowired
-    private Scheduler scheduler;
-
-    @Autowired
-    private TaskPersistenceService persistenceService;
-
-    @Autowired
-    private PersistenceProperties persistenceProperties;
+    public TaskSchedulerServiceImpl(TaskAdapter taskAdapter,
+            TaskRegistry taskRegistry,
+            Scheduler scheduler,
+            TaskPersistenceService persistenceService,
+            PersistenceProperties persistenceProperties) {
+        this.taskAdapter = taskAdapter;
+        this.taskRegistry = taskRegistry;
+        this.scheduler = scheduler;
+        this.persistenceService = persistenceService;
+        this.persistenceProperties = persistenceProperties;
+        log.info("TaskSchedulerServiceImpl初始化: persistence.type={}, persistenceService.class={}",
+                persistenceProperties.getType(),
+                persistenceService.getClass().getName());
+    }
 
     @Override
     @Transactional
@@ -68,9 +75,11 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
             definition.setGroup("default");
         }
         // 根据配置自动设置持久化属性
-        if ("database".equalsIgnoreCase(persistenceProperties.getType())) {
-            definition.setPersistent(true);
-        }
+        String persistenceType = persistenceProperties.getType();
+        boolean isDatabase = "database".equalsIgnoreCase(persistenceType);
+        definition.setPersistent(isDatabase);
+        log.info("任务持久化配置: taskName={}, persistence.type={}, isDatabase={}, persistent={}",
+                definition.getName(), persistenceType, isDatabase, definition.isPersistent());
         // async是boolean类型，不需要空检查
         // enabled是boolean类型，不需要空检查
         // repeatCount是int类型，不需要空检查
@@ -80,7 +89,11 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
 
         // 持久化任务到数据库
         if (definition.isPersistent()) {
+            log.info("开始持久化任务到数据库: taskId={}, taskName={}", definition.getId(), definition.getName());
             persistenceService.save(definition);
+            log.info("完成持久化任务到数据库: taskId={}, taskName={}", definition.getId(), definition.getName());
+        } else {
+            log.info("跳过任务持久化: taskName={}, persistent={}", definition.getName(), definition.isPersistent());
         }
 
         // 调度任务

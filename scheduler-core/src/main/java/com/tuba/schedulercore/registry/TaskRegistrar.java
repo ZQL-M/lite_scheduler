@@ -1,6 +1,7 @@
 package com.tuba.schedulercore.registry;
 
 import com.tuba.schedulercore.annotation.TubaTask;
+import com.tuba.schedulercore.config.PersistenceProperties;
 import com.tuba.schedulercore.enums.TimeUnit;
 import com.tuba.schedulercore.model.TaskDefinition;
 import com.tuba.schedulercore.scheduler.Scheduler;
@@ -32,11 +33,11 @@ public class TaskRegistrar implements ApplicationContextAware {
     private ApplicationContext applicationContext;
     private final TaskRegistry taskRegistry;
     private final Scheduler scheduler;
-    private final com.tuba.schedulercore.config.PersistenceProperties persistenceProperties;
+    private final PersistenceProperties persistenceProperties;
 
     @Autowired
     public TaskRegistrar(TaskRegistry taskRegistry, Scheduler scheduler,
-            com.tuba.schedulercore.config.PersistenceProperties persistenceProperties) {
+            PersistenceProperties persistenceProperties) {
         this.taskRegistry = taskRegistry;
         this.scheduler = scheduler;
         this.persistenceProperties = persistenceProperties;
