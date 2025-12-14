@@ -22,9 +22,11 @@ public class TaskAdapter {
             // 获取Task接口的execute方法
             EXECUTE_METHOD = Task.class.getMethod("execute", com.tuba.schedulercore.model.TaskContext.class);
             // 获取RunnableTaskWrapper的execute方法
-            RUNNABLE_TASK_EXECUTE_METHOD = RunnableTaskWrapper.class.getMethod("execute", com.tuba.schedulercore.model.TaskContext.class);
+            RUNNABLE_TASK_EXECUTE_METHOD = RunnableTaskWrapper.class.getMethod("execute",
+                    com.tuba.schedulercore.model.TaskContext.class);
             // 获取CallableTaskWrapper的execute方法
-            CALLABLE_TASK_EXECUTE_METHOD = CallableTaskWrapper.class.getMethod("execute", com.tuba.schedulercore.model.TaskContext.class);
+            CALLABLE_TASK_EXECUTE_METHOD = CallableTaskWrapper.class.getMethod("execute",
+                    com.tuba.schedulercore.model.TaskContext.class);
         } catch (NoSuchMethodException e) {
             throw new RuntimeException("Failed to get execute method from Task interface", e);
         }
