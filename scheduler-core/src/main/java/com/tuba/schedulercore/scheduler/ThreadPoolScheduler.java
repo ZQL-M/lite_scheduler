@@ -122,7 +122,27 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
         long fixedRate = definition.getFixedRate();
         if (fixedRate > 0) {
             log.debug("Scheduling task {} with fixed rate: {}ms", definition.getId(), fixedRate);
-            future = taskScheduler.scheduleAtFixedRate(runnable, fixedRate);
+
+            // 检查是否为一次性任务
+            int repeatCount = definition.getRepeatCount();
+            if (repeatCount == 1) {
+                // 一次性任务，使用Cron表达式或Date方式实现延迟执行
+                LocalDateTime nextFireTime = definition.getNextFireTime();
+                if (nextFireTime != null) {
+                    // 将LocalDateTime转换为Instant
+                    Instant startTime = nextFireTime.atZone(java.time.ZoneId.systemDefault()).toInstant();
+                    log.debug("Task {} is one-time task, scheduling at: {}", definition.getId(), nextFireTime);
+                    future = taskScheduler.schedule(runnable, startTime);
+                } else {
+                    // 如果没有nextFireTime，使用立即执行
+                    future = taskScheduler.schedule(runnable, Instant.now());
+                }
+            } else {
+                // 多次执行任务，使用固定频率，立即开始
+                future = taskScheduler.scheduleAtFixedRate(runnable, Instant.now(),
+                        java.time.Duration.ofMillis(fixedRate));
+            }
+
             scheduledFutures.put(definition.getId(), future);
             return;
         }
@@ -131,7 +151,27 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
         long fixedDelay = definition.getFixedDelay();
         if (fixedDelay > 0) {
             log.debug("Scheduling task {} with fixed delay: {}ms", definition.getId(), fixedDelay);
-            future = taskScheduler.scheduleWithFixedDelay(runnable, fixedDelay);
+
+            // 检查是否为一次性任务
+            int repeatCount = definition.getRepeatCount();
+            if (repeatCount == 1) {
+                // 一次性任务，使用Cron表达式或Date方式实现延迟执行
+                LocalDateTime nextFireTime = definition.getNextFireTime();
+                if (nextFireTime != null) {
+                    // 将LocalDateTime转换为Instant
+                    Instant startTime = nextFireTime.atZone(java.time.ZoneId.systemDefault()).toInstant();
+                    log.debug("Task {} is one-time task, scheduling at: {}", definition.getId(), nextFireTime);
+                    future = taskScheduler.schedule(runnable, startTime);
+                } else {
+                    // 如果没有nextFireTime，使用立即执行
+                    future = taskScheduler.schedule(runnable, Instant.now());
+                }
+            } else {
+                // 多次执行任务，使用固定延迟，立即开始
+                future = taskScheduler.scheduleWithFixedDelay(runnable, Instant.now(),
+                        java.time.Duration.ofMillis(fixedDelay));
+            }
+
             scheduledFutures.put(definition.getId(), future);
             return;
         }
@@ -254,12 +294,18 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
 
         // 3. Cron表达式
         if (definition.getCron() != null && !definition.getCron().isEmpty()) {
-            // 简单实现：对于Cron表达式，这里返回null，由Spring的CronTrigger处理
-            // 实际生产环境中，应该使用CronExpression解析器来计算下次触发时间
-            return null;
+            try {
+                // 使用Spring的CronExpression解析器计算下次触发时间
+                org.springframework.scheduling.support.CronExpression cronExpression = org.springframework.scheduling.support.CronExpression
+                        .parse(definition.getCron());
+                return cronExpression.next(lastFireTime);
+            } catch (IllegalArgumentException e) {
+                log.error("无效的Cron表达式: {}, 使用默认时间", definition.getCron(), e);
+                return lastFireTime.plusSeconds(1); // 默认1秒后执行
+            }
         }
 
-        // 默认返回null
-        return null;
+        // 默认立即执行
+        return lastFireTime;
     }
 }

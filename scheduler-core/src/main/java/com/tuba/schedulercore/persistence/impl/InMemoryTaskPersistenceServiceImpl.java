@@ -4,6 +4,7 @@ import com.tuba.schedulercore.model.TaskDefinition;
 import com.tuba.schedulercore.persistence.TaskPersistenceService;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +42,20 @@ public class InMemoryTaskPersistenceServiceImpl implements TaskPersistenceServic
             }
         }
         return enabledTasks;
+    }
+
+    @Override
+    public List<TaskDefinition> findTasksByNextFireTimeRange(LocalDateTime startTime, LocalDateTime endTime) {
+        List<TaskDefinition> tasksInRange = new ArrayList<>();
+        for (TaskDefinition task : taskMap.values()) {
+            if (task.isEnabled() && task.getNextFireTime() != null) {
+                LocalDateTime nextFireTime = task.getNextFireTime();
+                if (nextFireTime.isAfter(startTime) && nextFireTime.isBefore(endTime)) {
+                    tasksInRange.add(task);
+                }
+            }
+        }
+        return tasksInRange;
     }
 
     @Override

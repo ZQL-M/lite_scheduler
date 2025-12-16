@@ -80,17 +80,12 @@ public class TaskScanner implements DisposableBean {
             LocalDateTime scanAheadTime = now.plusNanos(scannerProperties.getScanAheadTime() * 1000000);
 
             // 从数据库加载临期任务
-            // 注意：这里需要TaskPersistenceService添加一个findTasksByNextFireTimeRange方法
-            // 目前先使用findEnabledTasks方法作为替代
-            List<TaskDefinition> tasks = persistenceService.findEnabledTasks();
+            List<TaskDefinition> tasks = persistenceService.findTasksByNextFireTimeRange(now, scanAheadTime);
 
             int loadedCount = 0;
             for (TaskDefinition task : tasks) {
-                // 检查任务是否在扫描时间范围内
-                if (task.getNextFireTime() != null &&
-                        task.getNextFireTime().isBefore(scanAheadTime) &&
-                        !loadedTasks.containsKey(task.getId())) {
-
+                // 检查任务是否已加载
+                if (!loadedTasks.containsKey(task.getId())) {
                     // 解析bean和method
                     if (parseBeanAndMethod(task)) {
                         // 注册任务到注册表
@@ -139,10 +134,34 @@ public class TaskScanner implements DisposableBean {
                 return false;
             }
 
-            // 从ApplicationContext获取bean实例
-            Object bean = applicationContext.getBean(task.getBeanName());
+            // 从ApplicationContext获取bean实例，添加容错机制
+            Object bean = null;
+            String beanName = task.getBeanName();
+
+            try {
+                // 1. 首先尝试使用原始beanName
+                bean = applicationContext.getBean(beanName);
+            } catch (org.springframework.beans.factory.NoSuchBeanDefinitionException e1) {
+                log.warn("使用原始beanName获取失败: {}, 尝试首字母小写", beanName);
+
+                // 2. 尝试首字母小写（Spring默认命名规则）
+                if (beanName.length() > 1) {
+                    String lowercaseBeanName = Character.toLowerCase(beanName.charAt(0)) + beanName.substring(1);
+                    try {
+                        bean = applicationContext.getBean(lowercaseBeanName);
+                        log.info("使用首字母小写beanName获取成功: {}", lowercaseBeanName);
+                    } catch (org.springframework.beans.factory.NoSuchBeanDefinitionException e2) {
+                        log.error("无法从ApplicationContext获取bean: {} 或 {}", beanName, lowercaseBeanName);
+                        return false;
+                    }
+                } else {
+                    log.error("无法从ApplicationContext获取bean: {}", beanName);
+                    return false;
+                }
+            }
+
             if (bean == null) {
-                log.error("无法从ApplicationContext获取bean: {}", task.getBeanName());
+                log.error("无法从ApplicationContext获取bean: {}", beanName);
                 return false;
             }
 

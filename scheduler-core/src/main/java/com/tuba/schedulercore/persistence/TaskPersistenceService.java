@@ -2,6 +2,7 @@ package com.tuba.schedulercore.persistence;
 
 import com.tuba.schedulercore.model.TaskDefinition;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -36,6 +37,15 @@ public interface TaskPersistenceService {
      * @return 任务定义列表
      */
     List<TaskDefinition> findEnabledTasks();
+
+    /**
+     * 根据下次触发时间范围查询临期任务
+     * 
+     * @param startTime 开始时间
+     * @param endTime   结束时间
+     * @return 任务定义列表
+     */
+    List<TaskDefinition> findTasksByNextFireTimeRange(LocalDateTime startTime, LocalDateTime endTime);
 
     /**
      * 更新任务定义

@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
@@ -74,15 +75,24 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
         if (definition.getGroup() == null) {
             definition.setGroup("default");
         }
-        // 根据配置自动设置持久化属性
+        // 根据配置自动设置持久化属性，但尊重传入的persistent值
         String persistenceType = persistenceProperties.getType();
         boolean isDatabase = "database".equalsIgnoreCase(persistenceType);
-        definition.setPersistent(isDatabase);
-        log.info("任务持久化配置: taskName={}, persistence.type={}, isDatabase={}, persistent={}",
-                definition.getName(), persistenceType, isDatabase, definition.isPersistent());
+        // 如果persistent为true，则尊重这个设置；否则根据配置自动设置
+        if (!definition.isPersistent() && isDatabase) {
+            definition.setPersistent(true);
+        }
+        log.info("任务持久化配置: taskName={}, persistence.type={}, isDatabase={}, persistent={}, repeatCount={}",
+                definition.getName(), persistenceType, isDatabase, definition.isPersistent(),
+                definition.getRepeatCount());
         // async是boolean类型，不需要空检查
         // enabled是boolean类型，不需要空检查
         // repeatCount是int类型，不需要空检查
+
+        // 计算初始nextFireTime
+        LocalDateTime nextFireTime = calculateInitialNextFireTime(definition);
+        definition.setNextFireTime(nextFireTime);
+        log.info("任务初始nextFireTime: taskName={}, nextFireTime={}", definition.getName(), nextFireTime);
 
         // 注册任务到注册表
         taskRegistry.register(definition);
@@ -168,6 +178,11 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
             definition.setPersistent(true);
         }
 
+        // 计算初始nextFireTime
+        LocalDateTime nextFireTime = calculateInitialNextFireTime(definition);
+        definition.setNextFireTime(nextFireTime);
+        log.info("任务初始nextFireTime: taskName={}, nextFireTime={}", definition.getName(), nextFireTime);
+
         // 注册任务到注册表
         taskRegistry.register(definition);
 
@@ -247,6 +262,11 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
         if ("database".equalsIgnoreCase(persistenceProperties.getType())) {
             definition.setPersistent(true);
         }
+
+        // 计算初始nextFireTime
+        LocalDateTime nextFireTime = calculateInitialNextFireTime(definition);
+        definition.setNextFireTime(nextFireTime);
+        log.info("任务初始nextFireTime: taskName={}, nextFireTime={}", definition.getName(), nextFireTime);
 
         // 注册任务到注册表
         taskRegistry.register(definition);
@@ -400,6 +420,45 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
         }
 
         return taskRegistry.get(taskId);
+    }
+
+    /**
+     * 计算任务的初始下次触发时间
+     * 
+     * @param definition 任务定义
+     * @return 下次触发时间
+     */
+    private LocalDateTime calculateInitialNextFireTime(TaskDefinition definition) {
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. 检查Cron表达式配置
+        String cron = definition.getCron();
+        if (cron != null && !cron.trim().isEmpty()) {
+            try {
+                // 使用Spring的CronExpression解析器计算下次触发时间
+                org.springframework.scheduling.support.CronExpression cronExpression = org.springframework.scheduling.support.CronExpression
+                        .parse(cron);
+                return cronExpression.next(now);
+            } catch (IllegalArgumentException e) {
+                log.error("无效的Cron表达式: {}, 使用默认时间", cron, e);
+                return now.plusSeconds(1); // 默认1秒后执行
+            }
+        }
+
+        // 2. 检查固定频率配置
+        long fixedRate = definition.getFixedRate();
+        if (fixedRate > 0) {
+            return now.plusNanos(fixedRate * 1000000); // 转换为纳秒
+        }
+
+        // 3. 检查固定延迟配置
+        long fixedDelay = definition.getFixedDelay();
+        if (fixedDelay > 0) {
+            return now.plusNanos(fixedDelay * 1000000); // 转换为纳秒
+        }
+
+        // 默认立即执行
+        return now;
     }
 
     /**

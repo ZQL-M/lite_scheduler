@@ -6,6 +6,7 @@ import com.tuba.schedulercore.persistence.TaskPersistenceService;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -14,7 +15,7 @@ import java.util.List;
 @Service
 public class DatabaseTaskPersistenceServiceImpl implements TaskPersistenceService {
 
-   @Resource
+    @Resource
     private TaskDefinitionMapper taskDefinitionMapper;
 
     @Override
@@ -35,6 +36,11 @@ public class DatabaseTaskPersistenceServiceImpl implements TaskPersistenceServic
     @Override
     public List<TaskDefinition> findEnabledTasks() {
         return taskDefinitionMapper.selectEnabledTasks();
+    }
+
+    @Override
+    public List<TaskDefinition> findTasksByNextFireTimeRange(LocalDateTime startTime, LocalDateTime endTime) {
+        return taskDefinitionMapper.selectByNextFireTimeRange(startTime, endTime);
     }
 
     @Override

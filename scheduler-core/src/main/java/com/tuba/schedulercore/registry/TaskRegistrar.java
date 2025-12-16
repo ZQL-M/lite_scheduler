@@ -5,6 +5,8 @@ import com.tuba.schedulercore.config.PersistenceProperties;
 import com.tuba.schedulercore.enums.TimeUnit;
 import com.tuba.schedulercore.model.TaskDefinition;
 import com.tuba.schedulercore.scheduler.Scheduler;
+import com.tuba.schedulercore.service.TaskSchedulerService;
+import com.tuba.schedulercore.task.Task;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.aop.support.AopUtils;
@@ -34,13 +36,15 @@ public class TaskRegistrar implements ApplicationContextAware {
     private final TaskRegistry taskRegistry;
     private final Scheduler scheduler;
     private final PersistenceProperties persistenceProperties;
+    private final TaskSchedulerService taskSchedulerService;
 
     @Autowired
     public TaskRegistrar(TaskRegistry taskRegistry, Scheduler scheduler,
-            PersistenceProperties persistenceProperties) {
+            PersistenceProperties persistenceProperties, TaskSchedulerService taskSchedulerService) {
         this.taskRegistry = taskRegistry;
         this.scheduler = scheduler;
         this.persistenceProperties = persistenceProperties;
+        this.taskSchedulerService = taskSchedulerService;
     }
 
     @EventListener(ContextRefreshedEvent.class)
@@ -102,6 +106,20 @@ public class TaskRegistrar implements ApplicationContextAware {
                 }
             }
 
+            // 创建Task实例，包装当前的bean和method
+            Task task = context -> {
+                try {
+                    if (method.getParameterCount() == 0) {
+                        method.invoke(bean);
+                    } else {
+                        method.invoke(bean, context);
+                    }
+                } catch (Exception e) {
+                    log.error("Failed to execute method {}: {}", method.getName(), e.getMessage(), e);
+                    throw new RuntimeException(e);
+                }
+            };
+
             String id = UUID.randomUUID().toString();
             String name = StringUtils.hasText(ann.name()) ? ann.name() : method.getName();
             TaskDefinition def = new TaskDefinition();
@@ -124,9 +142,8 @@ public class TaskRegistrar implements ApplicationContextAware {
             // 解析时间配置
             parseTimeConfiguration(ann, def);
 
-            // register in registry and schedule
-            taskRegistry.register(def);
-            scheduler.schedule(def);
+            // 使用TaskSchedulerService注册任务，这样才能触发持久化逻辑
+            taskSchedulerService.registerTask(task, def);
         } catch (NoSuchMethodException e) {
             log.error("Failed to register method {}: {}", method.getName(), e.getMessage(), e);
         } catch (Exception e) {

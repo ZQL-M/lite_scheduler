@@ -8,4 +8,11 @@
     <select id="selectByGroup" resultType="com.tuba.schedulercore.model.TaskDefinition">
         SELECT * FROM task_definition WHERE group_name = #{groupName}
     </select>
+    
+    <select id="selectByNextFireTimeRange" resultType="com.tuba.schedulercore.model.TaskDefinition">
+        SELECT * FROM task_definition 
+        WHERE enabled = 1 
+        AND next_fire_time IS NOT NULL
+        AND next_fire_time BETWEEN #{startTime} AND #{endTime}
+    </select>
 </mapper>
