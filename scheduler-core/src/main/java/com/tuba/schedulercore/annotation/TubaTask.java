@@ -51,7 +51,7 @@ public @interface TubaTask {
      * 0: 不执行
      * >0: 执行指定次数后停止
      */
-    int repeatCount() default -1;
+    int repeatCount() default 1;
 
     /**
      * 是否持久化到数据库

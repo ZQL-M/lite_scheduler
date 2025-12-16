@@ -2,11 +2,11 @@ package com.tuba.schedulercore.registry;
 
 import com.tuba.schedulercore.annotation.TubaTask;
 import com.tuba.schedulercore.config.PersistenceProperties;
-import com.tuba.schedulercore.enums.TimeUnit;
 import com.tuba.schedulercore.model.TaskDefinition;
 import com.tuba.schedulercore.scheduler.Scheduler;
 import com.tuba.schedulercore.service.TaskSchedulerService;
 import com.tuba.schedulercore.task.Task;
+import com.tuba.schedulercore.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.aop.support.AopUtils;
@@ -24,7 +24,7 @@ import java.lang.reflect.Method;
 import java.util.UUID;
 
 /**
- * 启动时扫描 Spring 容器中带 @ScheduledTask 的方法并注册到调度器。
+ * 启动时扫描 Spring 容器中带 @TubaTask 的方法并注册到调度器。
  * 支持 Spring AOP 代理，使用 AopUtils 获取原始类。
  */
 @Component
@@ -33,15 +33,12 @@ public class TaskRegistrar implements ApplicationContextAware {
     private static final Logger log = LoggerFactory.getLogger(TaskRegistrar.class);
 
     private ApplicationContext applicationContext;
-    private final TaskRegistry taskRegistry;
     private final Scheduler scheduler;
     private final PersistenceProperties persistenceProperties;
     private final TaskSchedulerService taskSchedulerService;
 
-    @Autowired
-    public TaskRegistrar(TaskRegistry taskRegistry, Scheduler scheduler,
+    public TaskRegistrar(Scheduler scheduler,
             PersistenceProperties persistenceProperties, TaskSchedulerService taskSchedulerService) {
-        this.taskRegistry = taskRegistry;
         this.scheduler = scheduler;
         this.persistenceProperties = persistenceProperties;
         this.taskSchedulerService = taskSchedulerService;
@@ -172,7 +169,7 @@ public class TaskRegistrar implements ApplicationContextAware {
         long interval = ann.interval();
         if (interval > 0) {
             // 根据时间单位转换为毫秒
-            long millisInterval = convertToMillis(interval, ann.type());
+            long millisInterval = TimeUtils.convertToMillis(interval, ann.type());
             def.setFixedRate(millisInterval);
             log.debug("Task {} uses interval: {} {} ({}ms)", def.getName(), interval, ann.type().name(),
                     millisInterval);
@@ -180,29 +177,6 @@ public class TaskRegistrar implements ApplicationContextAware {
         }
 
         log.error("Task {} has no valid time configuration", def.getName());
-    }
-
-    /**
-     * 将时间间隔转换为毫秒
-     * 
-     * @param interval 时间间隔
-     * @param timeUnit 时间单位
-     * @return 毫秒数
-     */
-    private long convertToMillis(long interval, TimeUnit timeUnit) {
-        switch (timeUnit) {
-            case SECONDS:
-                return interval * 1000;
-            case MINUTES:
-                return interval * 1000 * 60;
-            case HOURS:
-                return interval * 1000 * 60 * 60;
-            case DAYS:
-                return interval * 1000 * 60 * 60 * 24;
-            case MILLISECONDS:
-            default:
-                return interval;
-        }
     }
 
     @Override

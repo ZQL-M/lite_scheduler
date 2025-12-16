@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
  * 注解方式任务演示
  * 演示通过TubaTask注解创建持久化任务
  */
-@Component
+// @Component
 public class AnnotationTaskDemo {
 
     private static final Logger log = LoggerFactory.getLogger(AnnotationTaskDemo.class);

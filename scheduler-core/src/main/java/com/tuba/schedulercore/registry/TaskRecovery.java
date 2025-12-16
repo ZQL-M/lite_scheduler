@@ -6,7 +6,6 @@ import com.tuba.schedulercore.scheduler.Scheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeansException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.context.event.ContextRefreshedEvent;
@@ -27,13 +26,13 @@ public class TaskRecovery implements ApplicationContextAware {
 
     private ApplicationContext applicationContext;
 
-    @Autowired
+    @Resource
     private TaskPersistenceService persistenceService;
 
-    @Autowired
+    @Resource
     private TaskRegistry taskRegistry;
 
-    @Autowired
+    @Resource
     private Scheduler scheduler;
 
     @Override

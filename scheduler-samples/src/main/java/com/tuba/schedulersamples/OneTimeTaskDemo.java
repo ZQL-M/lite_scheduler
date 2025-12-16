@@ -6,27 +6,27 @@ import com.tuba.schedulercore.service.TaskSchedulerService;
 import com.tuba.schedulercore.task.Task;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
+import javax.annotation.Resource;
 import java.time.LocalDateTime;
 
 /**
  * 一次性任务演示
  * 演示一分钟后执行一次的任务，验证重启后不会丢失
  */
-// @Component  // 注释掉@Component注解，避免Spring扫描
+@Component  // 注释掉@Component注解，避免Spring扫描
 public class OneTimeTaskDemo implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(OneTimeTaskDemo.class);
 
-    @Autowired
+    @Resource
     private TaskSchedulerService taskSchedulerService;
 
     @Override
-    public void run(ApplicationArguments args) throws Exception {
+    public void run(ApplicationArguments args) {
         log.info("开始演示一次性任务...");
 
         // 创建一次性任务
@@ -82,7 +82,7 @@ public class OneTimeTaskDemo implements ApplicationRunner {
         definition.setMethodName("executeOneTimeTask"); // 使用当前类的方法
 
         // 使用当前对象作为Task实例，因为executeOneTimeTask方法实现了任务逻辑
-        Task task = context -> executeOneTimeTask(context);
+        Task task = this::executeOneTimeTask;
         
         // 计算剩余时间
         long remainingSeconds = java.time.Duration.between(LocalDateTime.now(), dueTime).getSeconds();
