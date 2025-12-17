@@ -12,7 +12,8 @@ import org.springframework.context.annotation.Primary;
  * 持久化配置类
  */
 @Configuration
-@EnableConfigurationProperties({ ExecutorProperties.class, PersistenceProperties.class, ScannerProperties.class })
+@EnableConfigurationProperties({ ExecutorProperties.class, PersistenceProperties.class, ScannerProperties.class,
+        RecoveryProperties.class })
 public class PersistenceConfiguration {
 
     /**

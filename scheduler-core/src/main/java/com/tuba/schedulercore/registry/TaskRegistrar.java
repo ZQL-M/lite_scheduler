@@ -12,7 +12,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.BeansException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.context.event.ContextRefreshedEvent;
@@ -111,7 +110,11 @@ public class TaskRegistrar implements ApplicationContextAware {
             }
 
             // 检查任务是否已存在（基于bean name+method name）
+            // 使用Spring默认bean名称规则：首字母小写
             String beanName = targetClass.getSimpleName();
+            if (beanName.length() > 1) {
+                beanName = Character.toLowerCase(beanName.charAt(0)) + beanName.substring(1);
+            }
             String methodName = method.getName();
             if (isTaskExists(beanName, methodName)) {
                 log.debug("Task {}.{} already exists, skipping registration", beanName, methodName);
@@ -137,7 +140,7 @@ public class TaskRegistrar implements ApplicationContextAware {
             TaskDefinition def = new TaskDefinition();
             def.setId(id);
             def.setName(name);
-            def.setGroup(ann.group());
+            def.setGroupName(ann.group());
             def.setAsync(ann.async());
             def.setBean(bean);
             // 使用原始类的方法，确保能正确反射调用

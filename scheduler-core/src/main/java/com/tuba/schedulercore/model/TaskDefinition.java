@@ -4,8 +4,8 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.tuba.schedulercore.enums.TaskStatus;
 import com.tuba.schedulercore.plugin.TaskPlugin;
-import com.tuba.schedulercore.model.TaskStatus;
 
 import java.lang.reflect.Method;
 import java.time.LocalDateTime;
@@ -26,7 +26,7 @@ public class TaskDefinition {
     private String name;
 
     @TableField("group_name")
-    private String group = "default";
+    private String groupName = "default";
 
     private String cron;
 
@@ -76,11 +76,12 @@ public class TaskDefinition {
     public TaskDefinition() {
     }
 
-    public TaskDefinition(String id, String name, String group, String cron, boolean async, Object bean, Method method,
+    public TaskDefinition(String id, String name, String groupName, String cron, boolean async, Object bean,
+            Method method,
             String description) {
         this.id = id;
         this.name = name;
-        this.group = group;
+        this.groupName = groupName;
         this.cron = cron;
         this.async = async;
         this.bean = bean;

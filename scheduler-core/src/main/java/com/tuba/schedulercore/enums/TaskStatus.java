@@ -3,7 +3,7 @@ package com.tuba.schedulercore.enums;
 /**
  * 任务状态枚举
  */
-public enum TaskStatus {
+public enum  TaskStatus {
     /**
      * 未执行，任务已创建但从未被扫描器处理过
      */
@@ -27,10 +27,5 @@ public enum TaskStatus {
     /**
      * 执行失败，任务执行过程中发生异常
      */
-    FAILED,
-    
-    /**
-     * 已取消，任务被手动或自动取消执行
-     */
-    CANCELLED
+    FAILED
 }

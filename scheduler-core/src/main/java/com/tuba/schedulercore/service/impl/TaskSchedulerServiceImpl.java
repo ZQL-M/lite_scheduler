@@ -101,6 +101,13 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
             TaskDefinition newDefinition = taskAdapter.createTaskDefinition(task);
             definition.setBean(newDefinition.getBean());
             definition.setMethod(newDefinition.getMethod());
+            // 复制beanName和methodName
+            if (definition.getBeanName() == null) {
+                definition.setBeanName(newDefinition.getBeanName());
+            }
+            if (definition.getMethodName() == null) {
+                definition.setMethodName(newDefinition.getMethodName());
+            }
         }
         // 注册任务核心逻辑
         return registerTaskCore(definition, true);
@@ -156,6 +163,13 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
             TaskDefinition newDefinition = taskAdapter.createTaskDefinition(runnable);
             definition.setBean(newDefinition.getBean());
             definition.setMethod(newDefinition.getMethod());
+            // 复制beanName和methodName
+            if (definition.getBeanName() == null) {
+                definition.setBeanName(newDefinition.getBeanName());
+            }
+            if (definition.getMethodName() == null) {
+                definition.setMethodName(newDefinition.getMethodName());
+            }
         }
 
         // 注册任务核心逻辑
@@ -213,6 +227,13 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
             TaskDefinition newDefinition = taskAdapter.createTaskDefinition(callable);
             definition.setBean(newDefinition.getBean());
             definition.setMethod(newDefinition.getMethod());
+            // 复制beanName和methodName
+            if (definition.getBeanName() == null) {
+                definition.setBeanName(newDefinition.getBeanName());
+            }
+            if (definition.getMethodName() == null) {
+                definition.setMethodName(newDefinition.getMethodName());
+            }
         }
 
         // 注册任务核心逻辑
@@ -448,8 +469,8 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
      */
     private void setTaskDefaultValues(TaskDefinition definition, boolean isTaskType) {
         // 设置默认分组
-        if (definition.getGroup() == null) {
-            definition.setGroup("default");
+        if (definition.getGroupName() == null) {
+            definition.setGroupName("default");
         }
 
         // 根据配置自动设置持久化属性

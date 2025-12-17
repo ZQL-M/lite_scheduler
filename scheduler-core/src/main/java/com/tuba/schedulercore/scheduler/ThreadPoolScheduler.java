@@ -1,10 +1,11 @@
 package com.tuba.schedulercore.scheduler;
 
 import com.tuba.schedulercore.config.ExecutorProperties;
+import com.tuba.schedulercore.enums.TaskStatus;
 import com.tuba.schedulercore.executor.TaskExecutor;
 import com.tuba.schedulercore.model.TaskContext;
 import com.tuba.schedulercore.model.TaskDefinition;
-import com.tuba.schedulercore.model.TaskStatus;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.DisposableBean;
@@ -266,12 +267,11 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
     }
 
     /**
-     * 创建Cron触发器
-     * 
-     * @param cron表达式
-     * @return Trigger实例
+     * 创建CronTrigger实例
+     * @param cron
+     * @return
      */
-    private Trigger createCronTrigger(String cron) {
+     private Trigger createCronTrigger(String cron) {
         // 尝试解析为数字秒（固定频率）
         try {
             long seconds = Long.parseLong(cron.trim());

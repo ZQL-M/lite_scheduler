@@ -14,5 +14,6 @@
         WHERE enabled = 1 
         AND next_fire_time IS NOT NULL
         AND next_fire_time BETWEEN #{startTime} AND #{endTime}
+        AND status != 'COMPLETED'
     </select>
 </mapper>
