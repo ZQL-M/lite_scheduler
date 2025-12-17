@@ -2,6 +2,7 @@ package com.tuba.schedulercore.scheduler;
 
 import com.tuba.schedulercore.config.ScannerProperties;
 import com.tuba.schedulercore.model.TaskDefinition;
+import com.tuba.schedulercore.model.TaskStatus;
 import com.tuba.schedulercore.persistence.TaskPersistenceService;
 import com.tuba.schedulercore.registry.TaskRegistry;
 import org.slf4j.Logger;
@@ -73,8 +74,6 @@ public class TaskScanner implements DisposableBean {
      */
     private void scanTasks() {
         try {
-            log.debug("开始扫描临期任务...");
-
             // 计算扫描时间范围
             LocalDateTime now = LocalDateTime.now();
             LocalDateTime scanAheadTime = now.plusNanos(scannerProperties.getScanAheadTime() * 1000000);
@@ -88,6 +87,8 @@ public class TaskScanner implements DisposableBean {
                 if (!loadedTasks.containsKey(task.getId())) {
                     // 解析bean和method
                     if (parseBeanAndMethod(task)) {
+                        // 更新任务状态为待执行
+                        task.setStatus(TaskStatus.PENDING);
                         // 注册任务到注册表
                         taskRegistry.register(task);
                         // 调度任务
@@ -95,8 +96,8 @@ public class TaskScanner implements DisposableBean {
                         // 标记为已加载
                         loadedTasks.put(task.getId(), true);
                         loadedCount++;
-                        log.debug("成功加载临期任务: {} (ID: {}), 下次触发时间: {}",
-                                task.getName(), task.getId(), task.getNextFireTime());
+                        log.info("成功加载临期任务: {} (ID: {}), 状态: {}, 下次触发时间: {}",
+                                task.getName(), task.getId(), task.getStatus(), task.getNextFireTime());
                     } else {
                         log.error("加载临期任务失败: {} (ID: {}) - 无法解析bean或method",
                                 task.getName(), task.getId());
@@ -104,13 +105,16 @@ public class TaskScanner implements DisposableBean {
 
                     // 检查是否达到单次扫描最大任务数量
                     if (loadedCount >= scannerProperties.getMaxTasksPerScan()) {
-                        log.debug("已达到单次扫描最大任务数量: {}, 结束本次扫描", scannerProperties.getMaxTasksPerScan());
+                        log.info("已达到单次扫描最大任务数量: {}, 结束本次扫描", scannerProperties.getMaxTasksPerScan());
                         break;
                     }
                 }
             }
 
-            log.debug("完成扫描临期任务，本次加载 {} 个任务", loadedCount);
+            // 只有在加载了任务或者发生了错误时才输出完成日志
+            if (loadedCount > 0) {
+                log.info("完成扫描临期任务，本次加载 {} 个任务", loadedCount);
+            }
         } catch (Exception e) {
             log.error("扫描任务时发生异常", e);
         }

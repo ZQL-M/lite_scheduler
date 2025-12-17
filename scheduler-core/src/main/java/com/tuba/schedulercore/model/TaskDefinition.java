@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.tuba.schedulercore.plugin.TaskPlugin;
+import com.tuba.schedulercore.model.TaskStatus;
 
 import java.lang.reflect.Method;
 import java.time.LocalDateTime;
@@ -64,6 +65,9 @@ public class TaskDefinition {
     @TableField("next_fire_time")
     private LocalDateTime nextFireTime; // 下次触发时间
 
+    @TableField("status")
+    private TaskStatus status = TaskStatus.NOT_EXECUTED; // 任务状态
+
     @TableField(exist = false)
     private List<TaskPlugin> plugins;
 
@@ -83,6 +87,7 @@ public class TaskDefinition {
         this.method = method;
         this.description = description;
         this.enabled = true;
+        this.status = TaskStatus.NOT_EXECUTED;
     }
 
     /**

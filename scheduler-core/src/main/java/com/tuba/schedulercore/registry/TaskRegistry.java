@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.tuba.schedulercore.model.TaskDefinition;
+import com.tuba.schedulercore.model.TaskStatus;
 import org.springframework.stereotype.Component;
 
 /**

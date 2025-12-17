@@ -20,3 +20,13 @@ lite-scheduler:
     thread-name-prefix: "lite-scheduler-"
   persistence:
     type: database  # database 或 memory
+
+# 日志配置
+logging:
+  level:
+    # 调整Spring JDBC相关日志级别，减少不必要的调试日志
+    org.springframework.jdbc: INFO
+    # 调整MyBatis相关日志级别，只在必要时输出SQL日志
+    com.tuba.schedulercore.mapper: INFO
+    # 调整Lite-Scheduler自身的日志级别
+    com.tuba.schedulercore: INFO

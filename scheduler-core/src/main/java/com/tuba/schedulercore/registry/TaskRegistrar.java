@@ -3,6 +3,7 @@ package com.tuba.schedulercore.registry;
 import com.tuba.schedulercore.annotation.TubaTask;
 import com.tuba.schedulercore.config.PersistenceProperties;
 import com.tuba.schedulercore.model.TaskDefinition;
+import com.tuba.schedulercore.persistence.TaskPersistenceService;
 import com.tuba.schedulercore.scheduler.Scheduler;
 import com.tuba.schedulercore.service.TaskSchedulerService;
 import com.tuba.schedulercore.task.Task;
@@ -21,6 +22,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.lang.reflect.Method;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -36,12 +38,17 @@ public class TaskRegistrar implements ApplicationContextAware {
     private final Scheduler scheduler;
     private final PersistenceProperties persistenceProperties;
     private final TaskSchedulerService taskSchedulerService;
+    private final TaskRegistry taskRegistry;
+    private final TaskPersistenceService persistenceService;
 
     public TaskRegistrar(Scheduler scheduler,
-            PersistenceProperties persistenceProperties, TaskSchedulerService taskSchedulerService) {
+            PersistenceProperties persistenceProperties, TaskSchedulerService taskSchedulerService,
+            TaskRegistry taskRegistry, TaskPersistenceService persistenceService) {
         this.scheduler = scheduler;
         this.persistenceProperties = persistenceProperties;
         this.taskSchedulerService = taskSchedulerService;
+        this.taskRegistry = taskRegistry;
+        this.persistenceService = persistenceService;
     }
 
     @EventListener(ContextRefreshedEvent.class)
@@ -103,6 +110,14 @@ public class TaskRegistrar implements ApplicationContextAware {
                 }
             }
 
+            // 检查任务是否已存在（基于bean name+method name）
+            String beanName = targetClass.getSimpleName();
+            String methodName = method.getName();
+            if (isTaskExists(beanName, methodName)) {
+                log.debug("Task {}.{} already exists, skipping registration", beanName, methodName);
+                return;
+            }
+
             // 创建Task实例，包装当前的bean和method
             Task task = context -> {
                 try {
@@ -127,8 +142,8 @@ public class TaskRegistrar implements ApplicationContextAware {
             def.setBean(bean);
             // 使用原始类的方法，确保能正确反射调用
             def.setMethod(targetClass.getDeclaredMethod(method.getName(), method.getParameterTypes()));
-            def.setBeanName(targetClass.getSimpleName());
-            def.setMethodName(method.getName());
+            def.setBeanName(beanName);
+            def.setMethodName(methodName);
             def.setDescription(ann.description());
             def.setEnabled(true); // 默认启用
             // 根据配置自动设置持久化属性，覆盖注解默认值
@@ -177,6 +192,40 @@ public class TaskRegistrar implements ApplicationContextAware {
         }
 
         log.error("Task {} has no valid time configuration", def.getName());
+    }
+
+    /**
+     * 检查任务是否已存在（基于bean name+method name）
+     * 
+     * @param beanName   类名
+     * @param methodName 方法名
+     * @return 是否存在
+     */
+    private boolean isTaskExists(String beanName, String methodName) {
+        // 1. 检查内存注册表
+        for (TaskDefinition existingTask : taskRegistry.getAll()) {
+            if (existingTask.getBeanName().equals(beanName) &&
+                    existingTask.getMethodName().equals(methodName)) {
+                return true;
+            }
+        }
+
+        // 2. 检查数据库（如果持久化服务可用）
+        if (persistenceService.isAvailable()) {
+            try {
+                List<TaskDefinition> dbTasks = persistenceService.findAll();
+                for (TaskDefinition dbTask : dbTasks) {
+                    if (dbTask.getBeanName().equals(beanName) &&
+                            dbTask.getMethodName().equals(methodName)) {
+                        return true;
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Failed to check task existence in database: {}", e.getMessage(), e);
+            }
+        }
+
+        return false;
     }
 
     @Override

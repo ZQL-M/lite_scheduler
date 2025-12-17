@@ -4,6 +4,7 @@ import com.tuba.schedulercore.config.ExecutorProperties;
 import com.tuba.schedulercore.executor.TaskExecutor;
 import com.tuba.schedulercore.model.TaskContext;
 import com.tuba.schedulercore.model.TaskDefinition;
+import com.tuba.schedulercore.model.TaskStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.DisposableBean;
@@ -50,7 +51,6 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
     // 保存任务执行次数，使用AtomicInteger保证线程安全
     private final Map<String, AtomicInteger> taskExecutionCounts = new ConcurrentHashMap<>();
 
-    @Autowired(required = false)
     public ThreadPoolScheduler(TaskExecutor taskExecutor, ExecutorProperties properties) {
         this.taskExecutor = taskExecutor;
         this.taskScheduler = new ThreadPoolTaskScheduler();
@@ -176,6 +176,8 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
             definition.setRepeatCount(remainingCount);
 
             if (currentCount >= repeatCount) {
+                // 任务已完成所有执行次数，更新状态为已完成
+                definition.setStatus(TaskStatus.COMPLETED);
                 log.info(
                         "Task {} has reached maximum execution count of {} (executed {} times). Unscheduling task.",
                         definition.getId(), repeatCount, currentCount);
@@ -266,7 +268,7 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
     /**
      * 创建Cron触发器
      * 
-     * @param
+     * @param cron表达式
      * @return Trigger实例
      */
     private Trigger createCronTrigger(String cron) {
@@ -300,6 +302,11 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
         }
         // 清理执行次数记录
         taskExecutionCounts.remove(taskId);
+
+        // 任务被取消，更新状态为CANCELLED
+        // 注意：这里无法直接获取TaskDefinition对象，需要通过TaskPersistenceService查询
+        // 但考虑到性能和复杂度，这里暂时不更新数据库中的状态
+        // 状态更新主要在任务执行和扫描阶段进行
     }
 
     /**

@@ -17,12 +17,14 @@ CREATE TABLE `task_definition` (
   `repeat_count` INT NOT NULL DEFAULT -1 COMMENT '剩余循环次数，-1表示无限循环',
   `last_fire_time` DATETIME NULL COMMENT '上次触发时间',
   `next_fire_time` DATETIME NULL COMMENT '下次触发时间',
+  `status` VARCHAR(32) NOT NULL DEFAULT 'NOT_EXECUTED' COMMENT '任务状态：NOT_EXECUTED/PENDING/COMPLETED/EXPIRED/FAILED/CANCELLED',
   `created_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
   INDEX `idx_group_name` (`group_name`),
   INDEX `idx_next_fire_time` (`next_fire_time`),
-  INDEX `idx_enabled` (`enabled`)
+  INDEX `idx_enabled` (`enabled`),
+  INDEX `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='任务定义表';
 
 -- 创建任务执行日志表
