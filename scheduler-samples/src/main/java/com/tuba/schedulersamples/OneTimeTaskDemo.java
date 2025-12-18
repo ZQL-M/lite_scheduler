@@ -11,6 +11,7 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 /**
@@ -56,12 +57,6 @@ public class OneTimeTaskDemo implements ApplicationRunner {
             // 继续执行，允许创建新任务
         }
         
-        // 创建任务定义，使用固定ID
-        TaskDefinition definition = new TaskDefinition();
-        definition.setId(taskId); // 设置固定ID，避免重复创建
-        definition.setName(taskName);
-        definition.setGroup(taskGroup);
-        
         // 计算一分钟后的时间点
         LocalDateTime dueTime = LocalDateTime.now().plusMinutes(1);
         // 生成Cron表达式：ss mm HH dd MM ?（标准6字段格式）
@@ -71,26 +66,27 @@ public class OneTimeTaskDemo implements ApplicationRunner {
                 dueTime.getHour(),
                 dueTime.getDayOfMonth(),
                 dueTime.getMonthValue());
-        definition.setCron(cron); // 使用Cron表达式设置一分钟后执行
-        definition.setRepeatCount(1); // 只执行一次
-        definition.setPersistent(true); // 持久化到数据库，支持重启恢复
-        definition.setEnabled(true); // 启用任务
         
-        // 设置beanName和methodName，使用当前类作为Spring bean
-        // Spring默认bean名称是类名首字母小写，所以使用oneTimeTaskDemo
-        definition.setBeanName("oneTimeTaskDemo");
-        definition.setMethodName("executeOneTimeTask"); // 使用当前类的方法
-
-        // 使用当前对象作为Task实例，因为executeOneTimeTask方法实现了任务逻辑
+        // 1. 创建Task实例
         Task task = this::executeOneTimeTask;
         
-        // 计算剩余时间
-        long remainingSeconds = java.time.Duration.between(LocalDateTime.now(), dueTime).getSeconds();
-        log.info("⏰ 一次性任务将在 {} 执行 (剩余 {} 秒)", dueTime, remainingSeconds);
-
-        // 注册任务，添加try-catch块捕获重复键异常
+        // 2. 直接创建并配置TaskDefinition，避免重复注册
+        TaskDefinition definition = new TaskDefinition();
+        definition.setId(taskId); // 设置固定ID，避免重复创建
+        definition.setName(taskName);
+        definition.setGroupName(taskGroup);
+        definition.setCron(cron); // 使用Cron表达式设置一分钟后执行
+        definition.setRepeatCount(1); // 只执行一次
+        definition.setPersistent(true); // 持久化到数据库
+        definition.setEnabled(true); // 启用任务
+        
+        // 3. 只注册一次任务
         try {
+            // 注册任务，使用简洁的方式
             String registeredTaskId = taskSchedulerService.registerTask(task, definition);
+            
+            // 计算剩余时间
+            long remainingSeconds = Duration.between(LocalDateTime.now(), dueTime).getSeconds();
             log.info("✅ 成功注册一次性任务");
             log.info("📅 任务ID: {}", registeredTaskId);
             log.info("⏰ 执行时间: {}", dueTime);

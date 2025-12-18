@@ -16,9 +16,10 @@ spring:
 # 日志配置
 logging:
   level:
-    com.tuba: DEBUG
+    com.tuba: INFO
     org.springframework: INFO
-    org.springframework.jdbc: DEBUG
+    org.springframework.jdbc: INFO
+    com.tuba.schedulercore.mapper: INFO
 # 应用配置
 server:
   port: 8087
@@ -33,3 +34,5 @@ lite-scheduler:
     thread-name-prefix: lite-scheduler-
   persistence:
     type: database  # database 或 memory
+  recovery:
+    mode: COMPENSATION
