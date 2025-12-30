@@ -1,8 +1,11 @@
 package com.tuba.schedulercore.scheduler;
 
+import com.tuba.schedulercore.config.ExecutorProperties;
 import com.tuba.schedulercore.executor.TaskExecutor;
 import com.tuba.schedulercore.model.TaskContext;
 import com.tuba.schedulercore.model.TaskDefinition;
+import com.tuba.schedulercore.service.TaskStatusService;
+import com.tuba.schedulercore.service.TaskTriggerService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +26,12 @@ class ThreadPoolSchedulerTest {
 
     @Mock
     private TaskExecutor taskExecutor;
+    @Mock
+    private TaskTriggerService taskTriggerService;
+    @Mock
+    private TaskStatusService taskStatusService;
+    @Mock
+    private ExecutorProperties executorProperties;
 
     private ThreadPoolScheduler scheduler;
     private TaskDefinition task1;
@@ -30,18 +39,19 @@ class ThreadPoolSchedulerTest {
 
     @BeforeEach
     void setUp() {
-        scheduler = new ThreadPoolScheduler(taskExecutor, null);  // null 使用默认配置
+        // 设置mock返回有效的池大小
+        when(executorProperties.getSchedulerPoolSize()).thenReturn(5);
+        
+        scheduler = new ThreadPoolScheduler(taskExecutor, executorProperties, taskTriggerService, taskStatusService);
         
         task1 = new TaskDefinition();
         task1.setId("task-1");
         task1.setName("Task 1");
-        task1.setCron("0/5 * * * * ?");  // Cron 表达式：每 5 秒
         task1.setEnabled(true);
         
         task2 = new TaskDefinition();
         task2.setId("task-2");
         task2.setName("Task 2");
-        task2.setCron("10");  // 数字秒：每 10 秒
         task2.setEnabled(true);
     }
 

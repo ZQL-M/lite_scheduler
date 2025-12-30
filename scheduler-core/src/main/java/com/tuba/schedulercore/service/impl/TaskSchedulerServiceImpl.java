@@ -7,6 +7,8 @@ import com.tuba.schedulercore.persistence.TaskPersistenceService;
 import com.tuba.schedulercore.registry.TaskRegistry;
 import com.tuba.schedulercore.scheduler.Scheduler;
 import com.tuba.schedulercore.service.TaskSchedulerService;
+import com.tuba.schedulercore.service.TaskStatusService;
+import com.tuba.schedulercore.service.TaskTriggerService;
 import com.tuba.schedulercore.task.Task;
 import com.tuba.schedulercore.task.TaskAdapter;
 import com.tuba.schedulercore.utils.TimeUtils;
@@ -61,6 +63,16 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
     private final PersistenceProperties persistenceProperties;
 
     /**
+     * 任务触发器服务，用于管理任务触发器
+     */
+    private final TaskTriggerService taskTriggerService;
+
+    /**
+     * 任务状态服务，用于管理任务执行状态
+     */
+    private final TaskStatusService taskStatusService;
+
+    /**
      * 构造方法
      *
      * @param taskAdapter           任务适配器，用于创建任务定义
@@ -68,18 +80,24 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
      * @param scheduler             调度器，负责实际的任务调度执行
      * @param persistenceService    任务持久化服务，用于将任务保存到数据库
      * @param persistenceProperties 持久化配置属性
+     * @param taskTriggerService    任务触发器服务，用于管理任务触发器
+     * @param taskStatusService     任务状态服务，用于管理任务执行状态
      */
     @Autowired
     public TaskSchedulerServiceImpl(TaskAdapter taskAdapter,
             TaskRegistry taskRegistry,
             Scheduler scheduler,
             TaskPersistenceService persistenceService,
-            PersistenceProperties persistenceProperties) {
+            PersistenceProperties persistenceProperties,
+            TaskTriggerService taskTriggerService,
+            TaskStatusService taskStatusService) {
         this.taskAdapter = taskAdapter;
         this.taskRegistry = taskRegistry;
         this.scheduler = scheduler;
         this.persistenceService = persistenceService;
         this.persistenceProperties = persistenceProperties;
+        this.taskTriggerService = taskTriggerService;
+        this.taskStatusService = taskStatusService;
         log.info("TaskSchedulerServiceImpl初始化: persistence.type={}, persistenceService.class={}",
                 persistenceProperties.getType(),
                 persistenceService.getClass().getName());
@@ -124,8 +142,11 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
     public String registerTask(Task task, String cron) {
         validateCron(cron);
 
-        TaskDefinition definition = createTaskDefinition(task, cron, "-Cron");
-        return registerTask(task, definition);
+        TaskDefinition definition = createTaskDefinition(task, "-Cron");
+        String taskId = registerTask(task, definition);
+        // 创建Cron触发器
+        taskTriggerService.createCronTrigger(taskId, cron, null, null, null, null, null);
+        return taskId;
     }
 
     /**
@@ -141,9 +162,11 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
         validateInterval(interval, timeUnit);
 
         long millisInterval = TimeUtils.convertToMillis(interval, timeUnit);
-        TaskDefinition definition = createTaskDefinition(task, null, "-FixedRate");
-        definition.setFixedRate(millisInterval);
-        return registerTask(task, definition);
+        TaskDefinition definition = createTaskDefinition(task, "-FixedRate");
+        String taskId = registerTask(task, definition);
+        // 创建固定频率触发器
+        taskTriggerService.createFixedRateTrigger(taskId, -1, millisInterval, null, null, null, null);
+        return taskId;
     }
 
     /**
@@ -187,8 +210,11 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
     public String registerTask(Runnable runnable, String cron) {
         validateCron(cron);
 
-        TaskDefinition definition = createTaskDefinition(runnable, cron, "-Runnable-Cron");
-        return registerTask(runnable, definition);
+        TaskDefinition definition = createTaskDefinition(runnable, "-Runnable-Cron");
+        String taskId = registerTask(runnable, definition);
+        // 创建Cron触发器
+        taskTriggerService.createCronTrigger(taskId, cron, null, null, null, null, null);
+        return taskId;
     }
 
     /**
@@ -204,9 +230,11 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
         validateInterval(interval, timeUnit);
 
         long millisInterval = TimeUtils.convertToMillis(interval, timeUnit);
-        TaskDefinition definition = createTaskDefinition(runnable, null, "-Runnable-FixedRate");
-        definition.setFixedRate(millisInterval);
-        return registerTask(runnable, definition);
+        TaskDefinition definition = createTaskDefinition(runnable, "-Runnable-FixedRate");
+        String taskId = registerTask(runnable, definition);
+        // 创建固定频率触发器
+        taskTriggerService.createFixedRateTrigger(taskId, -1, millisInterval, null, null, null, null);
+        return taskId;
     }
 
     /**
@@ -252,8 +280,11 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
     public <V> String registerTask(Callable<V> callable, String cron) {
         validateCron(cron);
 
-        TaskDefinition definition = createTaskDefinition(callable, cron, "-Callable-Cron");
-        return registerTask(callable, definition);
+        TaskDefinition definition = createTaskDefinition(callable, "-Callable-Cron");
+        String taskId = registerTask(callable, definition);
+        // 创建Cron触发器
+        taskTriggerService.createCronTrigger(taskId, cron, null, null, null, null, null);
+        return taskId;
     }
 
     /**
@@ -270,9 +301,11 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
         validateInterval(interval, timeUnit);
 
         long millisInterval = TimeUtils.convertToMillis(interval, timeUnit);
-        TaskDefinition definition = createTaskDefinition(callable, null, "-Callable-FixedRate");
-        definition.setFixedRate(millisInterval);
-        return registerTask(callable, definition);
+        TaskDefinition definition = createTaskDefinition(callable, "-Callable-FixedRate");
+        String taskId = registerTask(callable, definition);
+        // 创建固定频率触发器
+        taskTriggerService.createFixedRateTrigger(taskId, -1, millisInterval, null, null, null, null);
+        return taskId;
     }
 
     /**
@@ -403,7 +436,7 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
     /**
      * 注册任务核心逻辑，提取重复代码
      * <p>
-     * 处理任务注册的通用逻辑，包括ID生成、默认值设置、下次触发时间计算、
+     * 处理任务注册的通用逻辑，包括ID生成、默认值设置、
      * 注册表注册、持久化和调度等操作
      * </p>
      *
@@ -420,19 +453,11 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
         // 设置默认值
         setTaskDefaultValues(definition, isTaskType);
 
-        // 计算初始nextFireTime
-        LocalDateTime nextFireTime = calculateInitialNextFireTime(definition);
-        definition.setNextFireTime(nextFireTime);
-        log.info("任务初始nextFireTime: taskName={}, nextFireTime={}", definition.getName(), nextFireTime);
-
         // 注册任务到注册表
         taskRegistry.register(definition);
 
         // 持久化任务到数据库
         persistTask(definition);
-
-        // 调度任务
-        scheduleTask(definition);
 
         // 记录日志
         String taskType = isTaskType ? "任务" : (definition.getBean() instanceof Callable ? "Callable任务" : "Runnable任务");
@@ -445,15 +470,11 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
      * 创建TaskDefinition实例
      *
      * @param task   任务对象
-     * @param cron   Cron表达式
      * @param suffix 任务名称后缀
      * @return TaskDefinition实例
      */
-    private TaskDefinition createTaskDefinition(Object task, String cron, String suffix) {
+    private TaskDefinition createTaskDefinition(Object task, String suffix) {
         TaskDefinition definition = new TaskDefinition();
-        if (cron != null) {
-            definition.setCron(cron);
-        }
         definition.setName(task.getClass().getSimpleName() + suffix);
         return definition;
     }
@@ -489,51 +510,8 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
             }
         }
 
-        log.info("任务持久化配置: taskName={}, persistence.type={}, isDatabase={}, persistent={}, repeatCount={}",
-                definition.getName(), persistenceType, isDatabase, definition.isPersistent(),
-                definition.getRepeatCount());
-    }
-
-    /**
-     * 计算任务的初始下次触发时间
-     * <p>
-     * 根据任务定义中的Cron表达式、固定频率或固定延迟计算初始触发时间
-     * </p>
-     *
-     * @param definition 任务定义
-     * @return 下次触发时间
-     */
-    private LocalDateTime calculateInitialNextFireTime(TaskDefinition definition) {
-        LocalDateTime now = LocalDateTime.now();
-
-        // 1. 检查Cron表达式配置
-        String cron = definition.getCron();
-        if (cron != null && !cron.trim().isEmpty()) {
-            try {
-                // 使用Spring的CronExpression解析器计算下次触发时间
-                org.springframework.scheduling.support.CronExpression cronExpression = org.springframework.scheduling.support.CronExpression
-                        .parse(cron);
-                return cronExpression.next(now);
-            } catch (IllegalArgumentException e) {
-                log.error("无效的Cron表达式: {}, 使用默认时间", cron, e);
-                return now.plusSeconds(1); // 默认1秒后执行
-            }
-        }
-
-        // 2. 检查固定频率配置
-        long fixedRate = definition.getFixedRate();
-        if (fixedRate > 0) {
-            return now.plusNanos(fixedRate * 1000000); // 转换为纳秒
-        }
-
-        // 3. 检查固定延迟配置
-        long fixedDelay = definition.getFixedDelay();
-        if (fixedDelay > 0) {
-            return now.plusNanos(fixedDelay * 1000000); // 转换为纳秒
-        }
-
-        // 默认立即执行
-        return now;
+        log.info("任务持久化配置: taskName={}, persistence.type={}, isDatabase={}, persistent={}",
+                definition.getName(), persistenceType, isDatabase, definition.isPersistent());
     }
 
     /**

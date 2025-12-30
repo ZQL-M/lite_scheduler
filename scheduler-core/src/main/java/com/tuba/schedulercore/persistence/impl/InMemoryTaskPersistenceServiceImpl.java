@@ -46,16 +46,9 @@ public class InMemoryTaskPersistenceServiceImpl implements TaskPersistenceServic
 
     @Override
     public List<TaskDefinition> findTasksByNextFireTimeRange(LocalDateTime startTime, LocalDateTime endTime) {
-        List<TaskDefinition> tasksInRange = new ArrayList<>();
-        for (TaskDefinition task : taskMap.values()) {
-            if (task.isEnabled() && task.getNextFireTime() != null) {
-                LocalDateTime nextFireTime = task.getNextFireTime();
-                if (nextFireTime.isAfter(startTime) && nextFireTime.isBefore(endTime)) {
-                    tasksInRange.add(task);
-                }
-            }
-        }
-        return tasksInRange;
+        // 在新的设计中，任务的调度信息已经从TaskDefinition中分离出来
+        // 简单返回所有已启用的任务，由调度器自行处理触发逻辑
+        return findEnabledTasks();
     }
 
     @Override

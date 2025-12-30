@@ -29,7 +29,6 @@ public class TaskController {
         return registry.getAll().stream().map(d -> new Object() {
             public String id = d.getId();
             public String name = d.getName();
-            public String cron = d.getCron();
             public boolean async = d.isAsync();
             public String bean = d.getBean().getClass().getName();
             public String method = d.getMethod().getName();

@@ -1,7 +1,6 @@
 package com.tuba.schedulercore.executor;
 
 import com.tuba.schedulercore.config.ExecutorProperties;
-import com.tuba.schedulercore.enums.TaskStatus;
 import com.tuba.schedulercore.log.TaskLogService;
 import com.tuba.schedulercore.model.TaskContext;
 import com.tuba.schedulercore.model.TaskDefinition;
@@ -17,7 +16,6 @@ import org.springframework.stereotype.Component;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -98,17 +96,9 @@ public class SimpleTaskExecutor implements TaskExecutor, DisposableBean {
 
             context.setEndTime(Instant.now());
 
-            // 更新任务定义
+            // 更新任务定义 - 在新设计中，任务状态和调度信息已分离到TaskStatus和TaskTrigger表
+            // 这里只需要更新TaskDefinition的基本信息
             if (definition.isPersistent() && persistenceService != null && persistenceService.isAvailable()) {
-                definition.setLastFireTime(LocalDateTime.now());
-                
-                // 更新任务状态
-                if (definition.getRepeatCount() == 1) {
-                    // 一次性任务，执行完成后状态改为COMPLETED
-                    definition.setStatus(TaskStatus.COMPLETED);
-                }
-                // 周期性任务不需要修改状态，保持为PENDING
-                
                 persistenceService.update(definition);
             }
 
@@ -122,13 +112,9 @@ public class SimpleTaskExecutor implements TaskExecutor, DisposableBean {
             Throwable error = extractActualError(e);
             context.setError(error);
 
-            // 更新任务定义
+            // 更新任务定义 - 在新设计中，任务状态和调度信息已分离到TaskStatus和TaskTrigger表
+            // 这里只需要更新TaskDefinition的基本信息
             if (definition.isPersistent() && persistenceService != null && persistenceService.isAvailable()) {
-                definition.setLastFireTime(LocalDateTime.now());
-                
-                // 更新任务状态为FAILED
-                definition.setStatus(TaskStatus.FAILED);
-                
                 persistenceService.update(definition);
             }
 
@@ -196,7 +182,7 @@ public class SimpleTaskExecutor implements TaskExecutor, DisposableBean {
     }
 
     @Override
-    public void destroy() throws Exception {
+    public void destroy() {
         log.info("Shutting down SimpleTaskExecutor...");
         executor.shutdown(); // 先停止接受新任务
 

@@ -2,7 +2,6 @@ package com.tuba.schedulercore.scheduler;
 
 import com.tuba.schedulercore.config.ScannerProperties;
 import com.tuba.schedulercore.model.TaskDefinition;
-import com.tuba.schedulercore.enums.TaskStatus;
 import com.tuba.schedulercore.persistence.TaskPersistenceService;
 import com.tuba.schedulercore.registry.TaskRegistry;
 import org.slf4j.Logger;
@@ -14,14 +13,13 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
-import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 
 /**
- * 任务扫描仪，定期扫描数据库中的临期任务
+ * 任务扫描仪，定期扫描数据库中的任务并确保它们被正确调度
  */
 @Component
 public class TaskScanner implements DisposableBean {
@@ -65,8 +63,8 @@ public class TaskScanner implements DisposableBean {
         scanTask = taskScheduler.scheduleAtFixedRate(
                 this::scanTasks,
                 scannerProperties.getScanInterval());
-        log.info("TaskScanner initialized with scan interval: {}ms, scan ahead time: {}ms",
-                scannerProperties.getScanInterval(), scannerProperties.getScanAheadTime());
+        log.info("TaskScanner initialized with scan interval: {}ms",
+                scannerProperties.getScanInterval());
     }
 
     /**
@@ -74,21 +72,15 @@ public class TaskScanner implements DisposableBean {
      */
     private void scanTasks() {
         try {
-            // 计算扫描时间范围
-            LocalDateTime now = LocalDateTime.now();
-            LocalDateTime scanAheadTime = now.plusNanos(scannerProperties.getScanAheadTime() * 1000000);
-
-            // 从数据库加载临期任务
-            List<TaskDefinition> tasks = persistenceService.findTasksByNextFireTimeRange(now, scanAheadTime);
+            // 从数据库加载所有已启用的任务
+            List<TaskDefinition> tasks = persistenceService.findEnabledTasks();
 
             int loadedCount = 0;
             for (TaskDefinition task : tasks) {
-                // 检查任务是否已加载或已完成
-                if (!loadedTasks.containsKey(task.getId()) && task.getStatus() != TaskStatus.COMPLETED) {
+                // 检查任务是否已加载
+                if (!loadedTasks.containsKey(task.getId())) {
                     // 解析bean和method
                     if (parseBeanAndMethod(task)) {
-                        // 更新任务状态为待执行
-                        task.setStatus(TaskStatus.PENDING);
                         // 注册任务到注册表
                         taskRegistry.register(task);
                         // 调度任务
@@ -96,10 +88,10 @@ public class TaskScanner implements DisposableBean {
                         // 标记为已加载
                         loadedTasks.put(task.getId(), true);
                         loadedCount++;
-                        log.info("成功加载临期任务: {} (ID: {}), 状态: {}, 下次触发时间: {}",
-                                task.getName(), task.getId(), task.getStatus(), task.getNextFireTime());
+                        log.info("成功加载任务: {} (ID: {})",
+                                task.getName(), task.getId());
                     } else {
-                        log.error("加载临期任务失败: {} (ID: {}) - 无法解析bean或method",
+                        log.error("加载任务失败: {} (ID: {}) - 无法解析bean或method",
                                 task.getName(), task.getId());
                     }
 
@@ -113,7 +105,7 @@ public class TaskScanner implements DisposableBean {
 
             // 只有在加载了任务或者发生了错误时才输出完成日志
             if (loadedCount > 0) {
-                log.info("完成扫描临期任务，本次加载 {} 个任务", loadedCount);
+                log.info("完成扫描任务，本次加载 {} 个任务", loadedCount);
             }
         } catch (Exception e) {
             log.error("扫描任务时发生异常", e);

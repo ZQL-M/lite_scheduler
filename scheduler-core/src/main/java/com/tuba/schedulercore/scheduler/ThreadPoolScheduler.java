@@ -1,10 +1,14 @@
 package com.tuba.schedulercore.scheduler;
 
 import com.tuba.schedulercore.config.ExecutorProperties;
-import com.tuba.schedulercore.enums.TaskStatus;
 import com.tuba.schedulercore.executor.TaskExecutor;
 import com.tuba.schedulercore.model.TaskContext;
 import com.tuba.schedulercore.model.TaskDefinition;
+import com.tuba.schedulercore.service.TaskStatusService;
+import com.tuba.schedulercore.service.TaskTriggerService;
+import com.tuba.schedulercore.model.TaskTrigger;
+import com.tuba.schedulercore.model.CronTrigger;
+import com.tuba.schedulercore.model.SimpleTrigger;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,7 +16,6 @@ import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.Trigger;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
-import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.scheduling.support.PeriodicTrigger;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -21,6 +24,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -47,13 +52,18 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
 
     private final ThreadPoolTaskScheduler taskScheduler;
     private final TaskExecutor taskExecutor;
+    private final TaskTriggerService taskTriggerService;
+    private final TaskStatusService taskStatusService;
     // 保存 ScheduledFuture 以便取消任务
     private final Map<String, ScheduledFuture<?>> scheduledFutures = new ConcurrentHashMap<>();
     // 保存任务执行次数，使用AtomicInteger保证线程安全
     private final Map<String, AtomicInteger> taskExecutionCounts = new ConcurrentHashMap<>();
 
-    public ThreadPoolScheduler(TaskExecutor taskExecutor, ExecutorProperties properties) {
+    public ThreadPoolScheduler(TaskExecutor taskExecutor, ExecutorProperties properties,
+            TaskTriggerService taskTriggerService, TaskStatusService taskStatusService) {
         this.taskExecutor = taskExecutor;
+        this.taskTriggerService = taskTriggerService;
+        this.taskStatusService = taskStatusService;
         this.taskScheduler = new ThreadPoolTaskScheduler();
 
         // 使用Optional简化null检查
@@ -90,31 +100,48 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
         // 初始化任务执行次数
         taskExecutionCounts.putIfAbsent(definition.getId(), new AtomicInteger(0));
 
-        // 创建任务执行逻辑
-        Runnable taskRunnable = createTaskRunnable(definition);
-
-        ScheduledFuture<?> future;
-
-        // 1. 检查固定频率配置
-        long fixedRate = definition.getFixedRate();
-        if (fixedRate > 0) {
-            future = scheduleFixedRateTask(definition, taskRunnable);
-        }
-        // 2. 检查固定延迟配置
-        else if (definition.getFixedDelay() > 0) {
-            future = scheduleFixedDelayTask(definition, taskRunnable);
-        }
-        // 3. 检查 Cron 表达式配置
-        else if (StringUtils.hasText(definition.getCron())) {
-            future = scheduleCronTask(definition, taskRunnable);
-        }
-        // 无有效配置
-        else {
-            log.error("Task {} has no valid scheduling configuration", definition.getId());
+        // 获取任务关联的所有触发器
+        List<TaskTrigger> triggers = taskTriggerService.getTriggersByTaskId(definition.getId());
+        if (triggers == null || triggers.isEmpty()) {
+            log.error("Task {} has no triggers, skipping schedule.", definition.getId());
             return;
         }
 
-        scheduledFutures.put(definition.getId(), future);
+        // 为每个触发器创建调度任务
+        for (TaskTrigger trigger : triggers) {
+            if (!trigger.isEnabled()) {
+                log.debug("Trigger {} for task {} is disabled, skipping schedule.",
+                        trigger.getId(), definition.getId());
+                continue;
+            }
+
+            // 创建任务执行逻辑
+            Runnable taskRunnable = createTaskRunnable(definition);
+            ScheduledFuture<?> future;
+
+            // 根据触发器类型创建不同的调度
+            switch (trigger.getTriggerType()) {
+                case "CRON":
+                    future = scheduleCronTask(definition, trigger, taskRunnable);
+                    break;
+                case "FIXED_RATE":
+                    future = scheduleFixedRateTask(definition, trigger, taskRunnable);
+                    break;
+                case "FIXED_DELAY":
+                    future = scheduleFixedDelayTask(definition, trigger, taskRunnable);
+                    break;
+                default:
+                    log.error("Unknown trigger type: {} for task {}",
+                            trigger.getTriggerType(), definition.getId());
+                    continue;
+            }
+
+            if (future != null) {
+                // 使用 taskId_triggerId 作为 key，支持一个任务多个触发器
+                String key = definition.getId() + "_" + trigger.getId();
+                scheduledFutures.put(key, future);
+            }
+        }
     }
 
     /**
@@ -126,7 +153,14 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
     private Runnable createTaskRunnable(TaskDefinition definition) {
         return () -> {
             // 检查任务是否被取消，避免不必要的执行
-            if (!scheduledFutures.containsKey(definition.getId())) {
+            boolean isUnscheduled = true;
+            for (String key : scheduledFutures.keySet()) {
+                if (key.startsWith(definition.getId() + "_")) {
+                    isUnscheduled = false;
+                    break;
+                }
+            }
+            if (isUnscheduled) {
                 log.debug("Task {} has been unscheduled, skipping execution.", definition.getId());
                 return;
             }
@@ -134,7 +168,14 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
             // 确保同一个任务在同一时间只有一个实例在执行
             synchronized (this) {
                 // 再次检查任务是否被取消（双重检查）
-                if (!scheduledFutures.containsKey(definition.getId())) {
+                isUnscheduled = true;
+                for (String key : scheduledFutures.keySet()) {
+                    if (key.startsWith(definition.getId() + "_")) {
+                        isUnscheduled = false;
+                        break;
+                    }
+                }
+                if (isUnscheduled) {
                     log.debug("Task {} has been unscheduled, skipping execution.", definition.getId());
                     return;
                 }
@@ -151,15 +192,6 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
      * @param definition 任务定义
      */
     private void executeTask(TaskDefinition definition) {
-        // 更新任务的last_fire_time为当前时间
-        Instant now = Instant.now();
-        LocalDateTime lastFireTime = LocalDateTime.ofInstant(now, DEFAULT_ZONE);
-        definition.setLastFireTime(lastFireTime);
-
-        // 计算下次触发时间
-        LocalDateTime nextFireTime = calculateNextFireTime(definition, lastFireTime);
-        definition.setNextFireTime(nextFireTime);
-
         // 执行任务
         TaskContext ctx = new TaskContext(definition);
         taskExecutor.execute(ctx);
@@ -169,20 +201,23 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
                 k -> new AtomicInteger(0));
         int currentCount = count.incrementAndGet();
 
-        // 检查是否达到最大执行次数
-        int repeatCount = definition.getRepeatCount();
-        if (repeatCount != INFINITE_REPEAT) {
-            // 更新任务的剩余执行次数
-            int remainingCount = Math.max(0, repeatCount - currentCount);
-            definition.setRepeatCount(remainingCount);
-
-            if (currentCount >= repeatCount) {
-                // 任务已完成所有执行次数，更新状态为已完成
-                definition.setStatus(TaskStatus.COMPLETED);
-                log.info(
-                        "Task {} has reached maximum execution count of {} (executed {} times). Unscheduling task.",
-                        definition.getId(), repeatCount, currentCount);
-                unschedule(definition.getId());
+        // 获取所有触发器，检查是否有达到最大执行次数的
+        List<TaskTrigger> triggers = taskTriggerService.getTriggersByTaskId(definition.getId());
+        for (TaskTrigger trigger : triggers) {
+            // 获取简单触发器配置（CRON触发器没有重复次数限制）
+            if ("FIXED_RATE".equals(trigger.getTriggerType()) || "FIXED_DELAY".equals(trigger.getTriggerType())) {
+                SimpleTrigger simpleTrigger = taskTriggerService.getSimpleTrigger(trigger.getId());
+                if (simpleTrigger != null && simpleTrigger.getRepeatCount() != INFINITE_REPEAT) {
+                    // 检查是否达到最大执行次数
+                    if (currentCount >= simpleTrigger.getRepeatCount()) {
+                        // 任务已完成所有执行次数
+                        log.info(
+                                "Task {} has reached maximum execution count of {} (executed {} times). Unscheduling task.",
+                                definition.getId(), simpleTrigger.getRepeatCount(), currentCount);
+                        unschedule(definition.getId());
+                        break;
+                    }
+                }
             }
         }
     }
@@ -191,16 +226,24 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
      * 调度固定频率任务
      * 
      * @param definition 任务定义
+     * @param trigger    触发器
      * @param runnable   任务执行逻辑
      * @return ScheduledFuture实例
      */
-    private ScheduledFuture<?> scheduleFixedRateTask(TaskDefinition definition, Runnable runnable) {
-        long fixedRate = definition.getFixedRate();
+    private ScheduledFuture<?> scheduleFixedRateTask(TaskDefinition definition, TaskTrigger trigger,
+            Runnable runnable) {
+        SimpleTrigger simpleTrigger = taskTriggerService.getSimpleTrigger(trigger.getId());
+        if (simpleTrigger == null) {
+            log.error("No simple trigger found for trigger ID: {}", trigger.getId());
+            return null;
+        }
+
+        long fixedRate = simpleTrigger.getRepeatInterval();
         log.debug("Scheduling task {} with fixed rate: {}ms", definition.getId(), fixedRate);
 
         // 检查是否为一次性任务
-        if (definition.getRepeatCount() == 1) {
-            return scheduleOneTimeTask(definition, runnable);
+        if (simpleTrigger.getRepeatCount() == 1) {
+            return scheduleOneTimeTask(definition, trigger, runnable);
         }
         // 多次执行任务，使用固定频率
         else {
@@ -213,16 +256,24 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
      * 调度固定延迟任务
      * 
      * @param definition 任务定义
+     * @param trigger    触发器
      * @param runnable   任务执行逻辑
      * @return ScheduledFuture实例
      */
-    private ScheduledFuture<?> scheduleFixedDelayTask(TaskDefinition definition, Runnable runnable) {
-        long fixedDelay = definition.getFixedDelay();
+    private ScheduledFuture<?> scheduleFixedDelayTask(TaskDefinition definition, TaskTrigger trigger,
+            Runnable runnable) {
+        SimpleTrigger simpleTrigger = taskTriggerService.getSimpleTrigger(trigger.getId());
+        if (simpleTrigger == null) {
+            log.error("No simple trigger found for trigger ID: {}", trigger.getId());
+            return null;
+        }
+
+        long fixedDelay = simpleTrigger.getRepeatInterval();
         log.debug("Scheduling task {} with fixed delay: {}ms", definition.getId(), fixedDelay);
 
         // 检查是否为一次性任务
-        if (definition.getRepeatCount() == 1) {
-            return scheduleOneTimeTask(definition, runnable);
+        if (simpleTrigger.getRepeatCount() == 1) {
+            return scheduleOneTimeTask(definition, trigger, runnable);
         }
         // 多次执行任务，使用固定延迟
         else {
@@ -235,18 +286,20 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
      * 调度一次性任务
      * 
      * @param definition 任务定义
+     * @param trigger    触发器
      * @param runnable   任务执行逻辑
      * @return ScheduledFuture实例
      */
-    private ScheduledFuture<?> scheduleOneTimeTask(TaskDefinition definition, Runnable runnable) {
-        LocalDateTime nextFireTime = definition.getNextFireTime();
-        if (nextFireTime != null) {
+    private ScheduledFuture<?> scheduleOneTimeTask(TaskDefinition definition, TaskTrigger trigger, Runnable runnable) {
+        // 检查触发器是否有开始时间
+        if (trigger.getStartTime() != null) {
             // 将LocalDateTime转换为Instant
-            Instant startTime = nextFireTime.atZone(DEFAULT_ZONE).toInstant();
-            log.debug("Task {} is one-time task, scheduling at: {}", definition.getId(), nextFireTime);
+            Instant startTime = trigger.getStartTime().atZone(DEFAULT_ZONE).toInstant();
+            log.debug("Task {} is one-time task, scheduling at: {}",
+                    definition.getId(), trigger.getStartTime());
             return taskScheduler.schedule(runnable, startTime);
         } else {
-            // 如果没有nextFireTime，使用立即执行
+            // 如果没有开始时间，使用立即执行
             return taskScheduler.schedule(runnable, Instant.now());
         }
     }
@@ -255,23 +308,31 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
      * 调度Cron表达式任务
      * 
      * @param definition 任务定义
+     * @param trigger    触发器
      * @param runnable   任务执行逻辑
      * @return ScheduledFuture实例
      */
-    private ScheduledFuture<?> scheduleCronTask(TaskDefinition definition, Runnable runnable) {
-        String cron = definition.getCron();
+    private ScheduledFuture<?> scheduleCronTask(TaskDefinition definition, TaskTrigger trigger, Runnable runnable) {
+        com.tuba.schedulercore.model.CronTrigger cronTrigger = taskTriggerService.getCronTrigger(trigger.getId());
+        if (cronTrigger == null) {
+            log.error("No cron trigger found for trigger ID: {}", trigger.getId());
+            return null;
+        }
+
+        String cron = cronTrigger.getCronExpression();
         log.debug("Scheduling task {} with cron: {}", definition.getId(), cron);
 
-        Trigger trigger = createCronTrigger(cron);
-        return taskScheduler.schedule(runnable, trigger);
+        Trigger springTrigger = createCronTrigger(cron);
+        return taskScheduler.schedule(runnable, springTrigger);
     }
 
     /**
      * 创建CronTrigger实例
+     * 
      * @param cron
      * @return
      */
-     private Trigger createCronTrigger(String cron) {
+    private Trigger createCronTrigger(String cron) {
         // 尝试解析为数字秒（固定频率）
         try {
             long seconds = Long.parseLong(cron.trim());
@@ -286,7 +347,7 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
         }
 
         // 使用Cron表达式
-        return new CronTrigger(cron);
+        return new org.springframework.scheduling.support.CronTrigger(cron);
     }
 
     /**
@@ -296,10 +357,25 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
      */
     @Override
     public void unschedule(String taskId) {
-        ScheduledFuture<?> future = scheduledFutures.remove(taskId);
-        if (future != null) {
-            future.cancel(true); // 取消任务，true 表示中断正在执行的任务
+        // 删除所有与该任务相关的触发器调度
+        synchronized (scheduledFutures) {
+            // 找到所有匹配的key
+            List<String> keysToRemove = new ArrayList<>();
+            for (String key : scheduledFutures.keySet()) {
+                if (key.startsWith(taskId + "_")) {
+                    keysToRemove.add(key);
+                }
+            }
+
+            // 取消并删除所有匹配的任务
+            for (String key : keysToRemove) {
+                ScheduledFuture<?> future = scheduledFutures.remove(key);
+                if (future != null) {
+                    future.cancel(true); // 取消任务，true 表示中断正在执行的任务
+                }
+            }
         }
+
         // 清理执行次数记录
         taskExecutionCounts.remove(taskId);
 
@@ -390,52 +466,4 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
         taskExecutor.execute(ctx);
     }
 
-    /**
-     * 计算任务的下次触发时间
-     * 
-     * @param definition   任务定义
-     * @param lastFireTime 上次触发时间
-     * @return 下次触发时间
-     */
-    private LocalDateTime calculateNextFireTime(TaskDefinition definition, LocalDateTime lastFireTime) {
-        // 1. 固定频率
-        long fixedRate = definition.getFixedRate();
-        if (fixedRate > 0) {
-            return lastFireTime.plus(Duration.ofMillis(fixedRate));
-        }
-
-        // 2. 固定延迟
-        long fixedDelay = definition.getFixedDelay();
-        if (fixedDelay > 0) {
-            return lastFireTime.plus(Duration.ofMillis(fixedDelay));
-        }
-
-        // 3. Cron表达式
-        String cron = definition.getCron();
-        if (StringUtils.hasText(cron)) {
-            try {
-                // 尝试解析为数字秒（固定频率）
-                long seconds = Long.parseLong(cron.trim());
-                if (seconds > 0) {
-                    // 数字秒，使用固定频率计算
-                    return lastFireTime.plusSeconds(seconds);
-                }
-            } catch (NumberFormatException e) {
-                // 不是数字，尝试作为完整cron表达式解析
-            }
-
-            try {
-                // 使用Spring的CronExpression解析器计算下次触发时间
-                org.springframework.scheduling.support.CronExpression cronExpression = org.springframework.scheduling.support.CronExpression
-                        .parse(cron);
-                return cronExpression.next(lastFireTime);
-            } catch (IllegalArgumentException e) {
-                log.error("Invalid cron expression: {}, using default delay of {}s", cron, DEFAULT_DELAY_SECONDS, e);
-                return lastFireTime.plusSeconds(DEFAULT_DELAY_SECONDS);
-            }
-        }
-
-        // 默认立即执行
-        return lastFireTime;
-    }
 }

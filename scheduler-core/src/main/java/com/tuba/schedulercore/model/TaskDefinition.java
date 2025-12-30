@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.tuba.schedulercore.enums.TaskStatus;
 import com.tuba.schedulercore.plugin.TaskPlugin;
 
 import java.lang.reflect.Method;
@@ -12,12 +11,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 
-import lombok.Data;
-
 /**
- * 任务定义，包含任务的元数据和执行信息
+ * 任务定义，包含任务的基本信息和执行目标
  */
-@Data
 @TableName("task_definition")
 public class TaskDefinition {
     @TableId(type = IdType.ASSIGN_UUID)
@@ -27,14 +23,6 @@ public class TaskDefinition {
 
     @TableField("group_name")
     private String groupName = "default";
-
-    private String cron;
-
-    @TableField("fixed_rate")
-    private long fixedRate = -1; // 固定频率，单位毫秒
-
-    @TableField("fixed_delay")
-    private long fixedDelay = -1; // 固定延迟，单位毫秒
 
     private boolean async = true;
 
@@ -56,17 +44,11 @@ public class TaskDefinition {
 
     private boolean persistent = false; // 是否持久化
 
-    @TableField("repeat_count")
-    private int repeatCount = -1; // 循环次数，-1表示无限循环
+    @TableField("created_time")
+    private LocalDateTime createdTime; // 创建时间
 
-    @TableField("last_fire_time")
-    private LocalDateTime lastFireTime; // 上次触发时间
-
-    @TableField("next_fire_time")
-    private LocalDateTime nextFireTime; // 下次触发时间
-
-    @TableField("status")
-    private TaskStatus status = TaskStatus.NOT_EXECUTED; // 任务状态
+    @TableField("updated_time")
+    private LocalDateTime updatedTime; // 更新时间
 
     @TableField(exist = false)
     private List<TaskPlugin> plugins;
@@ -76,19 +58,132 @@ public class TaskDefinition {
     public TaskDefinition() {
     }
 
-    public TaskDefinition(String id, String name, String groupName, String cron, boolean async, Object bean,
+    public TaskDefinition(String id, String name, String groupName, boolean async, Object bean,
             Method method,
             String description) {
         this.id = id;
         this.name = name;
         this.groupName = groupName;
-        this.cron = cron;
         this.async = async;
         this.bean = bean;
         this.method = method;
         this.description = description;
         this.enabled = true;
-        this.status = TaskStatus.NOT_EXECUTED;
+        this.createdTime = LocalDateTime.now();
+        this.updatedTime = LocalDateTime.now();
+    }
+
+    // Getters and Setters
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getGroupName() {
+        return groupName;
+    }
+
+    public void setGroupName(String groupName) {
+        this.groupName = groupName;
+    }
+
+    public boolean isAsync() {
+        return async;
+    }
+
+    public void setAsync(boolean async) {
+        this.async = async;
+    }
+
+    public Object getBean() {
+        return bean;
+    }
+
+    public void setBean(Object bean) {
+        this.bean = bean;
+    }
+
+    public Method getMethod() {
+        return method;
+    }
+
+    public void setMethod(Method method) {
+        this.method = method;
+    }
+
+    public String getBeanName() {
+        return beanName;
+    }
+
+    public void setBeanName(String beanName) {
+        this.beanName = beanName;
+    }
+
+    public String getMethodName() {
+        return methodName;
+    }
+
+    public void setMethodName(String methodName) {
+        this.methodName = methodName;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    public boolean isPersistent() {
+        return persistent;
+    }
+
+    public void setPersistent(boolean persistent) {
+        this.persistent = persistent;
+    }
+
+    public LocalDateTime getCreatedTime() {
+        return createdTime;
+    }
+
+    public void setCreatedTime(LocalDateTime createdTime) {
+        this.createdTime = createdTime;
+    }
+
+    public LocalDateTime getUpdatedTime() {
+        return updatedTime;
+    }
+
+    public void setUpdatedTime(LocalDateTime updatedTime) {
+        this.updatedTime = updatedTime;
+    }
+
+    public List<TaskPlugin> getPlugins() {
+        return plugins;
+    }
+
+    public void setPlugins(List<TaskPlugin> plugins) {
+        this.plugins = plugins;
     }
 
     /**

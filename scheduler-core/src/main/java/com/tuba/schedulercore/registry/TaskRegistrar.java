@@ -6,6 +6,7 @@ import com.tuba.schedulercore.model.TaskDefinition;
 import com.tuba.schedulercore.persistence.TaskPersistenceService;
 import com.tuba.schedulercore.scheduler.Scheduler;
 import com.tuba.schedulercore.service.TaskSchedulerService;
+import com.tuba.schedulercore.service.TaskTriggerService;
 import com.tuba.schedulercore.task.Task;
 import com.tuba.schedulercore.utils.TimeUtils;
 import org.slf4j.Logger;
@@ -39,15 +40,18 @@ public class TaskRegistrar implements ApplicationContextAware {
     private final TaskSchedulerService taskSchedulerService;
     private final TaskRegistry taskRegistry;
     private final TaskPersistenceService persistenceService;
+    private final TaskTriggerService taskTriggerService;
 
     public TaskRegistrar(Scheduler scheduler,
             PersistenceProperties persistenceProperties, TaskSchedulerService taskSchedulerService,
-            TaskRegistry taskRegistry, TaskPersistenceService persistenceService) {
+            TaskRegistry taskRegistry, TaskPersistenceService persistenceService,
+            TaskTriggerService taskTriggerService) {
         this.scheduler = scheduler;
         this.persistenceProperties = persistenceProperties;
         this.taskSchedulerService = taskSchedulerService;
         this.taskRegistry = taskRegistry;
         this.persistenceService = persistenceService;
+        this.taskTriggerService = taskTriggerService;
     }
 
     @EventListener(ContextRefreshedEvent.class)
@@ -152,13 +156,12 @@ public class TaskRegistrar implements ApplicationContextAware {
             // 根据配置自动设置持久化属性，覆盖注解默认值
             boolean isDatabasePersistence = "database".equalsIgnoreCase(persistenceProperties.getType());
             def.setPersistent(isDatabasePersistence || ann.persistent()); // 数据库模式下默认为true，否则使用注解值
-            def.setRepeatCount(ann.repeatCount());
-
-            // 解析时间配置
-            parseTimeConfiguration(ann, def);
 
             // 使用TaskSchedulerService注册任务，这样才能触发持久化逻辑
             taskSchedulerService.registerTask(task, def);
+
+            // 解析时间配置并创建触发器
+            createTriggerFromAnnotation(ann, def);
         } catch (NoSuchMethodException e) {
             log.error("Failed to register method {}: {}", method.getName(), e.getMessage(), e);
         } catch (Exception e) {
@@ -167,18 +170,18 @@ public class TaskRegistrar implements ApplicationContextAware {
     }
 
     /**
-     * 解析时间配置，将注解中的时间属性转换为任务定义的时间配置
+     * 根据注解创建触发器
      * 
      * @param ann 注解实例
      * @param def 任务定义
      */
-    private void parseTimeConfiguration(TubaTask ann, TaskDefinition def) {
+    private void createTriggerFromAnnotation(TubaTask ann, TaskDefinition def) {
         // 优先级：cron > interval+type
 
         // 1. 检查 cron 表达式
         String cron = ann.cron().trim();
         if (StringUtils.hasText(cron)) {
-            def.setCron(cron);
+            taskTriggerService.createCronTrigger(def.getId(), cron, null, null, null, null, null);
             log.debug("Task {} uses cron expression: {}", def.getName(), cron);
             return;
         }
@@ -188,7 +191,8 @@ public class TaskRegistrar implements ApplicationContextAware {
         if (interval > 0) {
             // 根据时间单位转换为毫秒
             long millisInterval = TimeUtils.convertToMillis(interval, ann.type());
-            def.setFixedRate(millisInterval);
+            taskTriggerService.createFixedRateTrigger(def.getId(), ann.repeatCount(), millisInterval,
+                    null, null, null, null);
             log.debug("Task {} uses interval: {} {} ({}ms)", def.getName(), interval, ann.type().name(),
                     millisInterval);
             return;

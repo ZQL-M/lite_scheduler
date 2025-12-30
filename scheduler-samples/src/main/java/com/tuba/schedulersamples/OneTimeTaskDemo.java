@@ -6,8 +6,10 @@ import com.tuba.schedulercore.service.TaskSchedulerService;
 import com.tuba.schedulercore.task.Task;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
@@ -25,6 +27,9 @@ public class OneTimeTaskDemo implements ApplicationRunner {
 
     @Resource
     private TaskSchedulerService taskSchedulerService;
+    
+    @Autowired
+    private ApplicationContext applicationContext;
 
     @Override
     public void run(ApplicationArguments args) {
@@ -70,13 +75,11 @@ public class OneTimeTaskDemo implements ApplicationRunner {
         // 1. 创建Task实例
         Task task = this::executeOneTimeTask;
         
-        // 2. 直接创建并配置TaskDefinition，避免重复注册
+        // 直接创建并配置TaskDefinition，避免重复注册
         TaskDefinition definition = new TaskDefinition();
         definition.setId(taskId); // 设置固定ID，避免重复创建
         definition.setName(taskName);
         definition.setGroupName(taskGroup);
-        definition.setCron(cron); // 使用Cron表达式设置一分钟后执行
-        definition.setRepeatCount(1); // 只执行一次
         definition.setPersistent(true); // 持久化到数据库
         definition.setEnabled(true); // 启用任务
         
@@ -85,13 +88,16 @@ public class OneTimeTaskDemo implements ApplicationRunner {
             // 注册任务，使用简洁的方式
             String registeredTaskId = taskSchedulerService.registerTask(task, definition);
             
+            // 创建Cron触发器，设置一分钟后执行
+            com.tuba.schedulercore.service.TaskTriggerService taskTriggerService = applicationContext.getBean(com.tuba.schedulercore.service.TaskTriggerService.class);
+            taskTriggerService.createCronTrigger(registeredTaskId, cron, null, null, null, null, null);
+            
             // 计算剩余时间
             long remainingSeconds = Duration.between(LocalDateTime.now(), dueTime).getSeconds();
             log.info("✅ 成功注册一次性任务");
             log.info("📅 任务ID: {}", registeredTaskId);
             log.info("⏰ 执行时间: {}", dueTime);
-            log.info("🔄 重复次数: {}", definition.getRepeatCount());
-            log.info("💾 持久化: {}", definition.isPersistent());
+            log.info(" 持久化: {}", definition.isPersistent());
             log.info("⚙️  Cron表达式: {}", cron);
         } catch (Exception e) {
             if (e.getMessage().contains("Duplicate entry") || e.getMessage().contains("duplicate key")) {
