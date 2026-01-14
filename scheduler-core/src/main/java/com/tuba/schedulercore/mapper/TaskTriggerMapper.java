@@ -16,14 +16,14 @@ public interface TaskTriggerMapper extends BaseMapper<TaskTrigger> {
      * @param taskId 任务ID
      * @return 触发器列表
      */
-    // List<TaskTrigger> selectByTaskId(@Param("taskId") String taskId);
+    List<TaskTrigger> selectByTaskId(@Param("taskId") String taskId);
     
     /**
      * 查询所有启用的触发器
      * 
      * @return 触发器列表
      */
-    // List<TaskTrigger> selectEnabledTriggers();
+    List<TaskTrigger> selectEnabledTriggers();
     
     /**
      * 根据触发器类型查询触发器
@@ -31,5 +31,5 @@ public interface TaskTriggerMapper extends BaseMapper<TaskTrigger> {
      * @param triggerType 触发器类型
      * @return 触发器列表
      */
-    // List<TaskTrigger> selectByTriggerType(@Param("triggerType") String triggerType);
+    List<TaskTrigger> selectByTriggerType(@Param("triggerType") String triggerType);
 }

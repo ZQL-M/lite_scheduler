@@ -58,6 +58,7 @@ Lite-Scheduler/
 - ✅ **异步/同步执行**：支持任务异步或同步执行
 - ✅ **完整的执行上下文**：提供任务执行过程中的所有信息
 - ✅ **优雅关闭**：应用关闭时优雅停止所有任务
+- ✅ **任务状态管理**：支持任务状态的完整生命周期管理（未执行/待执行/已完成/已过期/执行失败/已取消）
 
 ### 计划实现功能
 
@@ -190,11 +191,34 @@ public class TaskDefinition {
     private String description;      // 任务描述
     private boolean enabled = true;  // 是否启用
     private boolean persistent = false; // 是否持久化
+    private TaskStatus status = TaskStatus.NOT_EXECUTED; // 任务状态
     private List<TaskPlugin> plugins; // 任务级插件
 }
 ```
 
-#### 2.2 `TaskContext` - 任务执行上下文
+#### 2.2 `TaskStatus` - 任务状态枚举
+
+**位置**：`com.tuba.schedulercore.model.TaskStatus`
+
+**作用**：定义任务的完整生命周期状态
+
+**状态列表**：
+
+| 状态值          | 描述                           |
+|---------------|------------------------------|
+| NOT_EXECUTED  | 未执行，任务已创建但从未被扫描器处理过        |
+| PENDING       | 待执行，任务被扫描器扫描到并已添加到执行线程中    |
+| COMPLETED     | 已完成，任务执行完成且无剩余执行次数         |
+| EXPIRED       | 已过期，任务超过预期执行时间且未执行          |
+| FAILED        | 执行失败，任务执行过程中发生异常            |
+| CANCELLED     | 已取消，任务被手动或自动取消执行            |
+
+**状态流转**：
+```
+NOT_EXECUTED → PENDING → (COMPLETED | FAILED | EXPIRED | CANCELLED)
+```
+
+#### 2.3 `TaskContext` - 任务执行上下文
 
 **位置**：`com.tuba.schedulercore.model.TaskContext`
 
@@ -212,7 +236,7 @@ public class TaskContext {
 }
 ```
 
-#### 2.3 `TaskLog` - 任务执行日志
+#### 2.4 `TaskLog` - 任务执行日志
 
 **位置**：`com.tuba.schedulercore.model.TaskLog`
 
@@ -950,6 +974,6 @@ public class QuartzScheduler implements Scheduler {
 
 ---
 
-**版本**：v2.0.0  
-**更新时间**：2025-12-07  
+**版本**：v2.1.0  
+**更新时间**：2025-12-17  
 **作者**：Lite-Scheduler 开发团队
