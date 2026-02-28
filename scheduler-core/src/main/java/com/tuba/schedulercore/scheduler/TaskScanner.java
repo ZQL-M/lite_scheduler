@@ -4,6 +4,8 @@ import com.tuba.schedulercore.config.ScannerProperties;
 import com.tuba.schedulercore.model.TaskDefinition;
 import com.tuba.schedulercore.persistence.TaskPersistenceService;
 import com.tuba.schedulercore.registry.TaskRegistry;
+import com.tuba.schedulercore.task.TubaJobFactory;
+import com.tuba.schedulercore.utils.TaskUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.DisposableBean;
@@ -13,7 +15,6 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
@@ -40,6 +41,11 @@ public class TaskScanner implements DisposableBean {
 
     @Autowired
     private ScannerProperties scannerProperties;
+
+    @Autowired
+    private TubaJobFactory tubaJobFactory;
+
+    private final TaskUtils taskUtils = new TaskUtils();
 
     private final ThreadPoolTaskScheduler taskScheduler;
     private ScheduledFuture<?> scanTask;
@@ -119,7 +125,7 @@ public class TaskScanner implements DisposableBean {
      * @return 是否解析成功
      */
     private boolean parseBeanAndMethod(TaskDefinition task) {
-        return com.tuba.schedulercore.utils.TaskUtils.parseBeanAndMethod(applicationContext, task);
+        return taskUtils.parseBeanAndMethod(applicationContext, task);
     }
 
     /**

@@ -5,9 +5,12 @@ import com.baomidou.mybatisplus.annotation.TableName;
 
 import java.util.Objects;
 
+import lombok.Data;
+
 /**
  * Cron触发器，存储Cron表达式类型的触发器配置
  */
+@Data
 @TableName("task_cron_trigger")
 public class CronTrigger {
     @TableField("trigger_id")
@@ -32,39 +35,6 @@ public class CronTrigger {
         this.cronExpression = cronExpression;
         this.timeZoneId = "Asia/Shanghai";
         this.misfireInstruction = 0;
-    }
-
-    // Getters and Setters
-    public String getTriggerId() {
-        return triggerId;
-    }
-
-    public void setTriggerId(String triggerId) {
-        this.triggerId = triggerId;
-    }
-
-    public String getCronExpression() {
-        return cronExpression;
-    }
-
-    public void setCronExpression(String cronExpression) {
-        this.cronExpression = cronExpression;
-    }
-
-    public String getTimeZoneId() {
-        return timeZoneId;
-    }
-
-    public void setTimeZoneId(String timeZoneId) {
-        this.timeZoneId = timeZoneId;
-    }
-
-    public int getMisfireInstruction() {
-        return misfireInstruction;
-    }
-
-    public void setMisfireInstruction(int misfireInstruction) {
-        this.misfireInstruction = misfireInstruction;
     }
 
     /**

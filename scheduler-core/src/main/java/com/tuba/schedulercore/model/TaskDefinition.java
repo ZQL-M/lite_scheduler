@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.tuba.schedulercore.enums.TaskStatus;
 import com.tuba.schedulercore.plugin.TaskPlugin;
 
 import java.lang.reflect.Method;
@@ -32,11 +33,8 @@ public class TaskDefinition {
     @TableField(exist = false)
     private Method method;
 
-    @TableField("bean_name")
-    private String beanName; // Spring Bean名称（用于数据库恢复）
-
-    @TableField("method_name")
-    private String methodName; // 方法名（用于数据库恢复）
+    @TableField("job_class")
+    private String jobClass; // 任务类名（用于TubaJobFactory创建实例）
 
     private String description;
 
@@ -44,11 +42,32 @@ public class TaskDefinition {
 
     private boolean persistent = false; // 是否持久化
 
+    private boolean deleted = false; // 是否软删除
+
     @TableField("created_time")
     private LocalDateTime createdTime; // 创建时间
 
     @TableField("updated_time")
     private LocalDateTime updatedTime; // 更新时间
+
+    @TableField("last_fire_time")
+    private LocalDateTime lastFireTime; // 上次执行时间
+
+    @TableField("next_fire_time")
+    private LocalDateTime nextFireTime; // 下次执行时间
+
+    @TableField("fixed_rate")
+    private long fixedRate; // 固定速率执行间隔（毫秒）
+
+    @TableField("fixed_delay")
+    private long fixedDelay; // 固定延迟执行间隔（毫秒）
+
+    private String cron; // CRON表达式
+
+    @TableField("repeat_count")
+    private int repeatCount; // 重复执行次数
+
+    private String status; // 任务状态
 
     @TableField(exist = false)
     private List<TaskPlugin> plugins;
@@ -122,22 +141,6 @@ public class TaskDefinition {
         this.method = method;
     }
 
-    public String getBeanName() {
-        return beanName;
-    }
-
-    public void setBeanName(String beanName) {
-        this.beanName = beanName;
-    }
-
-    public String getMethodName() {
-        return methodName;
-    }
-
-    public void setMethodName(String methodName) {
-        this.methodName = methodName;
-    }
-
     public String getDescription() {
         return description;
     }
@@ -162,6 +165,14 @@ public class TaskDefinition {
         this.persistent = persistent;
     }
 
+    public boolean isDeleted() {
+        return deleted;
+    }
+
+    public void setDeleted(boolean deleted) {
+        this.deleted = deleted;
+    }
+
     public LocalDateTime getCreatedTime() {
         return createdTime;
     }
@@ -184,6 +195,74 @@ public class TaskDefinition {
 
     public void setPlugins(List<TaskPlugin> plugins) {
         this.plugins = plugins;
+    }
+
+    public String getJobClass() {
+        return jobClass;
+    }
+
+    public void setJobClass(String jobClass) {
+        this.jobClass = jobClass;
+    }
+
+    public LocalDateTime getLastFireTime() {
+        return lastFireTime;
+    }
+
+    public void setLastFireTime(LocalDateTime lastFireTime) {
+        this.lastFireTime = lastFireTime;
+    }
+
+    public LocalDateTime getNextFireTime() {
+        return nextFireTime;
+    }
+
+    public void setNextFireTime(LocalDateTime nextFireTime) {
+        this.nextFireTime = nextFireTime;
+    }
+
+    public long getFixedRate() {
+        return fixedRate;
+    }
+
+    public void setFixedRate(long fixedRate) {
+        this.fixedRate = fixedRate;
+    }
+
+    public long getFixedDelay() {
+        return fixedDelay;
+    }
+
+    public void setFixedDelay(long fixedDelay) {
+        this.fixedDelay = fixedDelay;
+    }
+
+    public String getCron() {
+        return cron;
+    }
+
+    public void setCron(String cron) {
+        this.cron = cron;
+    }
+
+    public int getRepeatCount() {
+        return repeatCount;
+    }
+
+    public void setRepeatCount(int repeatCount) {
+        this.repeatCount = repeatCount;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public void setStatus(TaskStatus status) {
+        this.status = status.name();
     }
 
     /**

@@ -6,7 +6,6 @@ import com.tuba.schedulercore.model.TaskDefinition;
 import com.tuba.schedulercore.persistence.TaskPersistenceService;
 import com.tuba.schedulercore.scheduler.Scheduler;
 import com.tuba.schedulercore.service.TaskSchedulerService;
-import com.tuba.schedulercore.service.TaskTriggerService;
 import com.tuba.schedulercore.task.Task;
 import com.tuba.schedulercore.utils.TimeUtils;
 import org.slf4j.Logger;
@@ -40,18 +39,15 @@ public class TaskRegistrar implements ApplicationContextAware {
     private final TaskSchedulerService taskSchedulerService;
     private final TaskRegistry taskRegistry;
     private final TaskPersistenceService persistenceService;
-    private final TaskTriggerService taskTriggerService;
 
     public TaskRegistrar(Scheduler scheduler,
             PersistenceProperties persistenceProperties, TaskSchedulerService taskSchedulerService,
-            TaskRegistry taskRegistry, TaskPersistenceService persistenceService,
-            TaskTriggerService taskTriggerService) {
+            TaskRegistry taskRegistry, TaskPersistenceService persistenceService) {
         this.scheduler = scheduler;
         this.persistenceProperties = persistenceProperties;
         this.taskSchedulerService = taskSchedulerService;
         this.taskRegistry = taskRegistry;
         this.persistenceService = persistenceService;
-        this.taskTriggerService = taskTriggerService;
     }
 
     @EventListener(ContextRefreshedEvent.class)
@@ -113,15 +109,11 @@ public class TaskRegistrar implements ApplicationContextAware {
                 }
             }
 
-            // 检查任务是否已存在（基于bean name+method name）
-            // 使用Spring默认bean名称规则：首字母小写
-            String beanName = targetClass.getSimpleName();
-            if (beanName.length() > 1) {
-                beanName = Character.toLowerCase(beanName.charAt(0)) + beanName.substring(1);
-            }
-            String methodName = method.getName();
-            if (isTaskExists(beanName, methodName)) {
-                log.debug("Task {}.{} already exists, skipping registration", beanName, methodName);
+            // 检查任务是否已存在（基于任务名称和分组）
+            String taskName = StringUtils.hasText(ann.name()) ? ann.name() : method.getName();
+            String groupName = ann.group();
+            if (isTaskExists(taskName, groupName)) {
+                log.debug("Task {}.{} already exists, skipping registration", groupName, taskName);
                 return;
             }
 
@@ -149,19 +141,17 @@ public class TaskRegistrar implements ApplicationContextAware {
             def.setBean(bean);
             // 使用原始类的方法，确保能正确反射调用
             def.setMethod(targetClass.getDeclaredMethod(method.getName(), method.getParameterTypes()));
-            def.setBeanName(beanName);
-            def.setMethodName(methodName);
             def.setDescription(ann.description());
             def.setEnabled(true); // 默认启用
             // 根据配置自动设置持久化属性，覆盖注解默认值
             boolean isDatabasePersistence = "database".equalsIgnoreCase(persistenceProperties.getType());
             def.setPersistent(isDatabasePersistence || ann.persistent()); // 数据库模式下默认为true，否则使用注解值
 
+            // 解析时间配置
+            parseTimeConfiguration(ann, def);
+
             // 使用TaskSchedulerService注册任务，这样才能触发持久化逻辑
             taskSchedulerService.registerTask(task, def);
-
-            // 解析时间配置并创建触发器
-            createTriggerFromAnnotation(ann, def);
         } catch (NoSuchMethodException e) {
             log.error("Failed to register method {}: {}", method.getName(), e.getMessage(), e);
         } catch (Exception e) {
@@ -170,18 +160,17 @@ public class TaskRegistrar implements ApplicationContextAware {
     }
 
     /**
-     * 根据注解创建触发器
+     * 解析时间配置，将注解中的时间属性转换为任务定义的时间配置
      * 
      * @param ann 注解实例
      * @param def 任务定义
      */
-    private void createTriggerFromAnnotation(TubaTask ann, TaskDefinition def) {
+    private void parseTimeConfiguration(TubaTask ann, TaskDefinition def) {
         // 优先级：cron > interval+type
 
         // 1. 检查 cron 表达式
         String cron = ann.cron().trim();
         if (StringUtils.hasText(cron)) {
-            taskTriggerService.createCronTrigger(def.getId(), cron, null, null, null, null, null);
             log.debug("Task {} uses cron expression: {}", def.getName(), cron);
             return;
         }
@@ -191,8 +180,6 @@ public class TaskRegistrar implements ApplicationContextAware {
         if (interval > 0) {
             // 根据时间单位转换为毫秒
             long millisInterval = TimeUtils.convertToMillis(interval, ann.type());
-            taskTriggerService.createFixedRateTrigger(def.getId(), ann.repeatCount(), millisInterval,
-                    null, null, null, null);
             log.debug("Task {} uses interval: {} {} ({}ms)", def.getName(), interval, ann.type().name(),
                     millisInterval);
             return;
@@ -202,17 +189,17 @@ public class TaskRegistrar implements ApplicationContextAware {
     }
 
     /**
-     * 检查任务是否已存在（基于bean name+method name）
+     * 检查任务是否已存在（基于任务名称和分组）
      * 
-     * @param beanName   类名
-     * @param methodName 方法名
+     * @param taskName  任务名称
+     * @param groupName 任务分组
      * @return 是否存在
      */
-    private boolean isTaskExists(String beanName, String methodName) {
+    private boolean isTaskExists(String taskName, String groupName) {
         // 1. 检查内存注册表
         for (TaskDefinition existingTask : taskRegistry.getAll()) {
-            if (existingTask.getBeanName().equals(beanName) &&
-                    existingTask.getMethodName().equals(methodName)) {
+            if (existingTask.getName().equals(taskName) &&
+                    existingTask.getGroupName().equals(groupName)) {
                 return true;
             }
         }
@@ -222,8 +209,8 @@ public class TaskRegistrar implements ApplicationContextAware {
             try {
                 List<TaskDefinition> dbTasks = persistenceService.findAll();
                 for (TaskDefinition dbTask : dbTasks) {
-                    if (dbTask.getBeanName().equals(beanName) &&
-                            dbTask.getMethodName().equals(methodName)) {
+                    if (dbTask.getName().equals(taskName) &&
+                            dbTask.getGroupName().equals(groupName)) {
                         return true;
                     }
                 }

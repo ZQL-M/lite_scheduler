@@ -49,7 +49,7 @@ public class TaskRecovery implements ApplicationContextAware {
      */
     @EventListener(ContextRefreshedEvent.class)
     public void recoverTasks() {
-        log.info("开始从数据库恢复任务");
+        log.info("开始从数据库恢复任务，恢复模式: {}", recoveryProperties.getMode());
 
         try {
             // 从数据库加载所有持久化任务
@@ -58,24 +58,20 @@ public class TaskRecovery implements ApplicationContextAware {
 
             int recoveredCount = 0;
             for (TaskDefinition task : tasks) {
-                try {
-                    // 解析bean和method
-                    if (parseBeanAndMethod(task)) {
-                        // 注册任务到注册表
-                        taskRegistry.register(task);
-                        
-                        // 调度任务
-                        scheduler.schedule(task);
-                        
-                        recoveredCount++;
-                        log.info("已恢复任务: {} (ID: {})",
-                                task.getName(), task.getId());
-                    } else {
-                        log.error("恢复任务失败: {} (ID: {}) - 无法解析bean或method",
-                                task.getName(), task.getId());
+                // 只恢复未删除的任务
+                if (!task.isDeleted() && task.isEnabled()) {
+                    // 尝试解析bean和method（如果需要）
+                    try {
+                        TaskUtils.parseBeanAndMethod(applicationContext, task);
+                    } catch (Exception e) {
+                        log.warn("解析任务 {} (ID: {}) 的bean和method时出错: {}",
+                                task.getName(), task.getId(), e.getMessage());
                     }
-                } catch (Exception e) {
-                    log.error("恢复任务失败: {} (ID: {})");
+
+                    // 注册任务到注册表
+                    taskRegistry.register(task);
+                    recoveredCount++;
+                    log.debug("已恢复任务: {} (ID: {})", task.getName(), task.getId());
                 }
             }
 
@@ -83,15 +79,5 @@ public class TaskRecovery implements ApplicationContextAware {
         } catch (Exception e) {
             log.error("任务恢复过程中发生异常", e);
         }
-    }
-
-    /**
-     * 解析bean和method对象
-     * 
-     * @param task 任务定义
-     * @return 是否解析成功
-     */
-    private boolean parseBeanAndMethod(TaskDefinition task) {
-        return TaskUtils.parseBeanAndMethod(applicationContext, task);
     }
 }

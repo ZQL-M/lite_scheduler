@@ -19,6 +19,7 @@ public class TaskAdapter {
     private static final Method EXECUTE_METHOD;
     private static final Method RUNNABLE_TASK_EXECUTE_METHOD;
     private static final Method CALLABLE_TASK_EXECUTE_METHOD;
+    private static final Method TUBA_TASK_EXECUTE_METHOD;
 
     static {
         try {
@@ -30,6 +31,8 @@ public class TaskAdapter {
             // 获取CallableTaskWrapper的execute方法
             CALLABLE_TASK_EXECUTE_METHOD = CallableTaskWrapper.class.getMethod("execute",
                     TaskContext.class);
+            // 获取TubaTask接口的execute方法
+            TUBA_TASK_EXECUTE_METHOD = TubaTask.class.getMethod("execute", TaskContext.class);
         } catch (NoSuchMethodException e) {
             throw new RuntimeException("Failed to get execute method from Task interface", e);
         }
@@ -54,17 +57,6 @@ public class TaskAdapter {
         String className = getOriginalClassName(task);
         definition.setName(className);
         definition.setDescription("Programmatically registered task");
-
-        // 自动设置beanName和methodName，与注解创建保持一致
-        // 获取beanName：使用Spring默认规则，首字母小写
-        String beanName = className;
-        if (beanName.length() > 1) {
-            beanName = Character.toLowerCase(beanName.charAt(0)) + beanName.substring(1);
-        }
-        definition.setBeanName(beanName);
-
-        // 获取methodName：使用Task接口的execute方法名
-        definition.setMethodName(EXECUTE_METHOD.getName());
 
         return definition;
     }
@@ -142,17 +134,6 @@ public class TaskAdapter {
         definition.setName(className);
         definition.setDescription("Runnable task");
 
-        // 自动设置beanName和methodName，与注解创建保持一致
-        // 获取beanName：使用Spring默认规则，首字母小写
-        String beanName = className;
-        if (beanName.length() > 1) {
-            beanName = Character.toLowerCase(beanName.charAt(0)) + beanName.substring(1);
-        }
-        definition.setBeanName(beanName);
-
-        // 获取methodName：使用RunnableTaskWrapper的execute方法名
-        definition.setMethodName(RUNNABLE_TASK_EXECUTE_METHOD.getName());
-
         return definition;
     }
 
@@ -177,16 +158,29 @@ public class TaskAdapter {
         definition.setName(className);
         definition.setDescription("Callable task");
 
-        // 自动设置beanName和methodName，与注解创建保持一致
-        // 获取beanName：使用Spring默认规则，首字母小写
-        String beanName = className;
-        if (beanName.length() > 1) {
-            beanName = Character.toLowerCase(beanName.charAt(0)) + beanName.substring(1);
-        }
-        definition.setBeanName(beanName);
+        return definition;
+    }
 
-        // 获取methodName：使用CallableTaskWrapper的execute方法名
-        definition.setMethodName(CALLABLE_TASK_EXECUTE_METHOD.getName());
+    /**
+     * 创建TubaTask类型的TaskDefinition
+     * 
+     * @param task TubaTask实例
+     * @return TaskDefinition
+     */
+    public TaskDefinition createTaskDefinition(TubaTask task) {
+        if (task == null) {
+            throw new IllegalArgumentException("TubaTask cannot be null");
+        }
+
+        TaskDefinition definition = new TaskDefinition();
+        definition.setBean(task);
+        definition.setMethod(TUBA_TASK_EXECUTE_METHOD);
+        definition.setJobClass(task.getClass().getName());
+
+        // 处理lambda表达式，获取原始类名
+        String className = getOriginalClassName(task);
+        definition.setName(className);
+        definition.setDescription("TubaTask");
 
         return definition;
     }
