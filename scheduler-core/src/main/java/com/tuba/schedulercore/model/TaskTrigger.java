@@ -5,7 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
  * 触发器基类，存储触发器的通用信息
  */
 @Data
-@EqualsAndHashCode(of = "id")
+@NoArgsConstructor
 @TableName("task_trigger")
 public class TaskTrigger {
     @TableId(type = IdType.ASSIGN_UUID)
@@ -35,17 +35,15 @@ public class TaskTrigger {
 
     private boolean enabled = true; // 触发器是否启用
 
+    private boolean deleted = false; // 是否软删除
+
     @TableField("created_time")
     private LocalDateTime createdTime; // 创建时间
 
     @TableField("updated_time")
     private LocalDateTime updatedTime; // 更新时间
 
-    // constructors
-
-    public TaskTrigger() {
-    }
-
+    // 构造方法
     public TaskTrigger(String id, String taskId, String triggerType, LocalDateTime startTime, LocalDateTime endTime) {
         this.id = id;
         this.taskId = taskId;

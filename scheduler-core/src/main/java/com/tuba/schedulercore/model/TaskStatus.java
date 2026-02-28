@@ -3,17 +3,22 @@ package com.tuba.schedulercore.model;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
-import java.util.Objects;
 
 /**
- * 任务状态，存储任务的实时执行状态
+ * 任务状态，存储任务的实时执行状态和统计信息
  */
+@Data
+@NoArgsConstructor
 @TableName("task_status")
 public class TaskStatus {
     @TableId("task_id")
     private String taskId; // 关联的任务ID
+
+    private String state = "WAITING"; // 任务状态
 
     @TableField("last_fire_time")
     private LocalDateTime lastFireTime; // 上次触发时间
@@ -21,8 +26,11 @@ public class TaskStatus {
     @TableField("next_fire_time")
     private LocalDateTime nextFireTime; // 下次触发时间
 
+    @TableField("last_execution_id")
+    private String lastExecutionId; // 上次执行记录ID
+
     @TableField("last_execution_status")
-    private String lastExecutionStatus; // 上次执行状态：SUCCESS/FAILURE/NONE
+    private String lastExecutionStatus = "NONE"; // 上次执行状态
 
     @TableField("consecutive_failures")
     private int consecutiveFailures = 0; // 连续失败次数
@@ -39,13 +47,10 @@ public class TaskStatus {
     @TableField("updated_time")
     private LocalDateTime updatedTime; // 更新时间
 
-    // constructors
-
-    public TaskStatus() {
-    }
-
+    // 构造方法
     public TaskStatus(String taskId) {
         this.taskId = taskId;
+        this.state = "WAITING";
         this.lastExecutionStatus = "NONE";
         this.consecutiveFailures = 0;
         this.totalExecutions = 0;
@@ -54,97 +59,29 @@ public class TaskStatus {
         this.updatedTime = LocalDateTime.now();
     }
 
-    // Getters and Setters
-    public String getTaskId() {
-        return taskId;
+    // 业务方法
+    public void recordSuccess(String executionId) {
+        this.lastExecutionId = executionId;
+        this.lastExecutionStatus = "SUCCESS";
+        this.lastFireTime = LocalDateTime.now();
+        this.consecutiveFailures = 0;
+        this.totalExecutions++;
+        this.totalSuccesses++;
+        this.updatedTime = LocalDateTime.now();
     }
 
-    public void setTaskId(String taskId) {
-        this.taskId = taskId;
+    public void recordFailure(String executionId) {
+        this.lastExecutionId = executionId;
+        this.lastExecutionStatus = "FAILURE";
+        this.lastFireTime = LocalDateTime.now();
+        this.consecutiveFailures++;
+        this.totalExecutions++;
+        this.totalFailures++;
+        this.updatedTime = LocalDateTime.now();
     }
 
-    public LocalDateTime getLastFireTime() {
-        return lastFireTime;
-    }
-
-    public void setLastFireTime(LocalDateTime lastFireTime) {
-        this.lastFireTime = lastFireTime;
-    }
-
-    public LocalDateTime getNextFireTime() {
-        return nextFireTime;
-    }
-
-    public void setNextFireTime(LocalDateTime nextFireTime) {
+    public void updateNextFireTime(LocalDateTime nextFireTime) {
         this.nextFireTime = nextFireTime;
-    }
-
-    public String getLastExecutionStatus() {
-        return lastExecutionStatus;
-    }
-
-    public void setLastExecutionStatus(String lastExecutionStatus) {
-        this.lastExecutionStatus = lastExecutionStatus;
-    }
-
-    public int getConsecutiveFailures() {
-        return consecutiveFailures;
-    }
-
-    public void setConsecutiveFailures(int consecutiveFailures) {
-        this.consecutiveFailures = consecutiveFailures;
-    }
-
-    public long getTotalExecutions() {
-        return totalExecutions;
-    }
-
-    public void setTotalExecutions(long totalExecutions) {
-        this.totalExecutions = totalExecutions;
-    }
-
-    public long getTotalSuccesses() {
-        return totalSuccesses;
-    }
-
-    public void setTotalSuccesses(long totalSuccesses) {
-        this.totalSuccesses = totalSuccesses;
-    }
-
-    public long getTotalFailures() {
-        return totalFailures;
-    }
-
-    public void setTotalFailures(long totalFailures) {
-        this.totalFailures = totalFailures;
-    }
-
-    public LocalDateTime getUpdatedTime() {
-        return updatedTime;
-    }
-
-    public void setUpdatedTime(LocalDateTime updatedTime) {
-        this.updatedTime = updatedTime;
-    }
-
-    /**
-     * 基于 taskId 的 equals 方法
-     */
-    @Override
-    public boolean equals(Object o) {
-        if (this == o)
-            return true;
-        if (o == null || getClass() != o.getClass())
-            return false;
-        TaskStatus that = (TaskStatus) o;
-        return Objects.equals(taskId, that.taskId);
-    }
-
-    /**
-     * 基于 taskId 的 hashCode 方法
-     */
-    @Override
-    public int hashCode() {
-        return Objects.hash(taskId);
+        this.updatedTime = LocalDateTime.now();
     }
 }

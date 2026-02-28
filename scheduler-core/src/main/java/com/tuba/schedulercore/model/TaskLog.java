@@ -43,6 +43,8 @@ public class TaskLog {
 
     private String exception;
 
+    private boolean deleted = false; // 是否软删除
+
     @TableField("created_time")
     private LocalDateTime createdTime;
 }

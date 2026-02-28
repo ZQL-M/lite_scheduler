@@ -4,7 +4,6 @@ import com.tuba.schedulercore.log.TaskLogService;
 import com.tuba.schedulercore.mapper.TaskLogMapper;
 import com.tuba.schedulercore.model.TaskContext;
 import com.tuba.schedulercore.model.TaskLog;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;

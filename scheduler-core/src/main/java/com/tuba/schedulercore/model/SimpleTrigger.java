@@ -3,13 +3,13 @@ package com.tuba.schedulercore.model;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 
 /**
  * 简单触发器，存储固定频率和固定延迟类型的触发器配置
  */
 @Data
-@EqualsAndHashCode(of = "triggerId")
+@NoArgsConstructor
 @TableName("task_simple_trigger")
 public class SimpleTrigger {
     @TableField("trigger_id")
@@ -27,11 +27,9 @@ public class SimpleTrigger {
     @TableField("misfire_instruction")
     private int misfireInstruction = 0; // 错过执行策略：0-忽略，1-立即执行，2-下次执行
 
+    private boolean deleted = false; // 是否软删除
+
     // constructors
-
-    public SimpleTrigger() {
-    }
-
     public SimpleTrigger(String triggerId, int repeatCount, long repeatInterval, String simpleType) {
         this.triggerId = triggerId;
         this.repeatCount = repeatCount;

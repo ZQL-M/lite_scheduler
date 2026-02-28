@@ -9,6 +9,7 @@ import com.tuba.schedulercore.model.TaskDefinition;
 public interface TubaJobFactory {
     /**
      * 创建任务实例
+     * 
      * @param definition 任务定义，包含任务的基本信息
      * @return 任务实例
      */
