@@ -1,5 +1,7 @@
 package com.tuba.schedulercore.model;
 
+import lombok.Data;
+
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
@@ -7,8 +9,9 @@ import java.util.Map;
 /**
  * 任务执行上下文，包含任务执行过程中的所有信息
  */
+@Data
 public class TaskContext {
-    private TaskDefinition definition;
+    private final TaskDefinition definition;
     private Instant startTime;
     private Instant endTime;
     private Map<String, Object> attributes = new HashMap<>();
@@ -16,38 +19,6 @@ public class TaskContext {
 
     public TaskContext(TaskDefinition definition) {
         this.definition = definition;
-    }
-
-    public TaskDefinition getDefinition() {
-        return definition;
-    }
-
-    public Instant getStartTime() {
-        return startTime;
-    }
-
-    public void setStartTime(Instant startTime) {
-        this.startTime = startTime;
-    }
-
-    public Instant getEndTime() {
-        return endTime;
-    }
-
-    public void setEndTime(Instant endTime) {
-        this.endTime = endTime;
-    }
-
-    public Map<String, Object> getAttributes() {
-        return attributes;
-    }
-
-    public Throwable getError() {
-        return error;
-    }
-
-    public void setError(Throwable error) {
-        this.error = error;
     }
 
     /**

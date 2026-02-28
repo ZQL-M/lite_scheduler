@@ -4,16 +4,16 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 import java.time.LocalDateTime;
-import java.util.Objects;
-
-import lombok.Data;
 
 /**
  * 触发器基类，存储触发器的通用信息
  */
 @Data
+@EqualsAndHashCode(of = "id")
 @TableName("task_trigger")
 public class TaskTrigger {
     @TableId(type = IdType.ASSIGN_UUID)
@@ -56,26 +56,5 @@ public class TaskTrigger {
         this.enabled = true;
         this.createdTime = LocalDateTime.now();
         this.updatedTime = LocalDateTime.now();
-    }
-
-    /**
-     * 基于 id 的 equals 方法
-     */
-    @Override
-    public boolean equals(Object o) {
-        if (this == o)
-            return true;
-        if (o == null || getClass() != o.getClass())
-            return false;
-        TaskTrigger that = (TaskTrigger) o;
-        return Objects.equals(id, that.id);
-    }
-
-    /**
-     * 基于 id 的 hashCode 方法
-     */
-    @Override
-    public int hashCode() {
-        return Objects.hash(id);
     }
 }

@@ -2,12 +2,14 @@ package com.tuba.schedulercore.model;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
-
-import java.util.Objects;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 /**
  * 简单触发器，存储固定频率和固定延迟类型的触发器配置
  */
+@Data
+@EqualsAndHashCode(of = "triggerId")
 @TableName("task_simple_trigger")
 public class SimpleTrigger {
     @TableField("trigger_id")
@@ -36,67 +38,5 @@ public class SimpleTrigger {
         this.repeatInterval = repeatInterval;
         this.simpleType = simpleType;
         this.misfireInstruction = 0;
-    }
-
-    // Getters and Setters
-    public String getTriggerId() {
-        return triggerId;
-    }
-
-    public void setTriggerId(String triggerId) {
-        this.triggerId = triggerId;
-    }
-
-    public int getRepeatCount() {
-        return repeatCount;
-    }
-
-    public void setRepeatCount(int repeatCount) {
-        this.repeatCount = repeatCount;
-    }
-
-    public long getRepeatInterval() {
-        return repeatInterval;
-    }
-
-    public void setRepeatInterval(long repeatInterval) {
-        this.repeatInterval = repeatInterval;
-    }
-
-    public String getSimpleType() {
-        return simpleType;
-    }
-
-    public void setSimpleType(String simpleType) {
-        this.simpleType = simpleType;
-    }
-
-    public int getMisfireInstruction() {
-        return misfireInstruction;
-    }
-
-    public void setMisfireInstruction(int misfireInstruction) {
-        this.misfireInstruction = misfireInstruction;
-    }
-
-    /**
-     * 基于 triggerId 的 equals 方法
-     */
-    @Override
-    public boolean equals(Object o) {
-        if (this == o)
-            return true;
-        if (o == null || getClass() != o.getClass())
-            return false;
-        SimpleTrigger that = (SimpleTrigger) o;
-        return Objects.equals(triggerId, that.triggerId);
-    }
-
-    /**
-     * 基于 triggerId 的 hashCode 方法
-     */
-    @Override
-    public int hashCode() {
-        return Objects.hash(triggerId);
     }
 }

@@ -2,15 +2,14 @@ package com.tuba.schedulercore.model;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
-
-import java.util.Objects;
-
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 /**
  * Cron触发器，存储Cron表达式类型的触发器配置
  */
 @Data
+@EqualsAndHashCode(of = "triggerId")
 @TableName("task_cron_trigger")
 public class CronTrigger {
     @TableField("trigger_id")
@@ -35,26 +34,5 @@ public class CronTrigger {
         this.cronExpression = cronExpression;
         this.timeZoneId = "Asia/Shanghai";
         this.misfireInstruction = 0;
-    }
-
-    /**
-     * 基于 triggerId 的 equals 方法
-     */
-    @Override
-    public boolean equals(Object o) {
-        if (this == o)
-            return true;
-        if (o == null || getClass() != o.getClass())
-            return false;
-        CronTrigger that = (CronTrigger) o;
-        return Objects.equals(triggerId, that.triggerId);
-    }
-
-    /**
-     * 基于 triggerId 的 hashCode 方法
-     */
-    @Override
-    public int hashCode() {
-        return Objects.hash(triggerId);
     }
 }
