@@ -117,20 +117,6 @@ public class TaskRegistrar implements ApplicationContextAware {
                 return;
             }
 
-            // 创建Task实例，包装当前的bean和method
-            Task task = context -> {
-                try {
-                    if (method.getParameterCount() == 0) {
-                        method.invoke(bean);
-                    } else {
-                        method.invoke(bean, context);
-                    }
-                } catch (Exception e) {
-                    log.error("Failed to execute method {}: {}", method.getName(), e.getMessage(), e);
-                    throw new RuntimeException(e);
-                }
-            };
-
             String id = UUID.randomUUID().toString();
             String name = StringUtils.hasText(ann.name()) ? ann.name() : method.getName();
             TaskDefinition def = new TaskDefinition();
@@ -138,9 +124,7 @@ public class TaskRegistrar implements ApplicationContextAware {
             def.setName(name);
             def.setGroupName(ann.group());
             def.setAsync(ann.async());
-            def.setBean(bean);
-            // 使用原始类的方法，确保能正确反射调用
-            def.setMethod(targetClass.getDeclaredMethod(method.getName(), method.getParameterTypes()));
+            def.setJobClass(targetClass.getName());
             def.setDescription(ann.description());
             def.setEnabled(true); // 默认启用
             // 根据配置自动设置持久化属性，覆盖注解默认值
@@ -151,9 +135,7 @@ public class TaskRegistrar implements ApplicationContextAware {
             parseTimeConfiguration(ann, def);
 
             // 使用TaskSchedulerService注册任务，这样才能触发持久化逻辑
-            taskSchedulerService.registerTask(task, def);
-        } catch (NoSuchMethodException e) {
-            log.error("Failed to register method {}: {}", method.getName(), e.getMessage(), e);
+            taskSchedulerService.registerTask(def);
         } catch (Exception e) {
             log.error("Failed to register method {}: {}", method.getName(), e.getMessage(), e);
         }

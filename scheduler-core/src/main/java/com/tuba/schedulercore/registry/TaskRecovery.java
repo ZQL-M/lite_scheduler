@@ -60,11 +60,11 @@ public class TaskRecovery implements ApplicationContextAware {
             for (TaskDefinition task : tasks) {
                 // 只恢复未删除的任务
                 if (!task.isDeleted() && task.isEnabled()) {
-                    // 尝试解析bean和method（如果需要）
+                    // 尝试验证任务类（如果需要）
                     try {
-                        TaskUtils.parseBeanAndMethod(applicationContext, task);
+                        TaskUtils.validateTaskClass(task);
                     } catch (Exception e) {
-                        log.warn("解析任务 {} (ID: {}) 的bean和method时出错: {}",
+                        log.warn("验证任务 {} (ID: {}) 的任务类时出错: {}",
                                 task.getName(), task.getId(), e.getMessage());
                     }
 

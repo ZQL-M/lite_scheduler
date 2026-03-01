@@ -45,8 +45,6 @@ public class TaskScanner implements DisposableBean {
     @Autowired
     private TubaJobFactory tubaJobFactory;
 
-    private final TaskUtils taskUtils = new TaskUtils();
-
     private final ThreadPoolTaskScheduler taskScheduler;
     private ScheduledFuture<?> scanTask;
 
@@ -85,8 +83,8 @@ public class TaskScanner implements DisposableBean {
             for (TaskDefinition task : tasks) {
                 // 检查任务是否已加载
                 if (!loadedTasks.containsKey(task.getId())) {
-                    // 解析bean和method
-                    if (parseBeanAndMethod(task)) {
+                    // 验证任务类
+                    if (TaskUtils.validateTaskClass(task)) {
                         // 注册任务到注册表
                         taskRegistry.register(task);
                         // 调度任务
@@ -97,7 +95,7 @@ public class TaskScanner implements DisposableBean {
                         log.info("成功加载任务: {} (ID: {})",
                                 task.getName(), task.getId());
                     } else {
-                        log.error("加载任务失败: {} (ID: {}) - 无法解析bean或method",
+                        log.error("加载任务失败: {} (ID: {}) - 任务类验证失败",
                                 task.getName(), task.getId());
                     }
 
@@ -116,16 +114,6 @@ public class TaskScanner implements DisposableBean {
         } catch (Exception e) {
             log.error("扫描任务时发生异常", e);
         }
-    }
-
-    /**
-     * 解析bean和method对象
-     * 
-     * @param task 任务定义
-     * @return 是否解析成功
-     */
-    private boolean parseBeanAndMethod(TaskDefinition task) {
-        return taskUtils.parseBeanAndMethod(applicationContext, task);
     }
 
     /**

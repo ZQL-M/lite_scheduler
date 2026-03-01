@@ -149,35 +149,33 @@ public class SimpleTaskExecutor implements TaskExecutor, DisposableBean {
         if (def == null) {
             throw new IllegalStateException("TaskDefinition is null");
         }
-        Method method = def.getMethod();
-        if (method == null) {
-            throw new IllegalStateException("Method is null for task: " + def.getId());
-        }
-        Object bean = def.getBean();
-        if (bean == null) {
-            throw new IllegalStateException("Bean is null for task: " + def.getId());
-        }
-        method.setAccessible(true);
 
-        if (method.getParameterCount() == 0) {
-            // 无参方法
-            method.invoke(bean);
-        } else if (method.getParameterCount() == 1) {
-            // 单参数方法，检查是否为 TaskContext 类型
-            Class<?> paramType = method.getParameterTypes()[0];
-            if (TaskContext.class.isAssignableFrom(paramType)) {
-                // 传递正确的 TaskContext（包含 startTime、attributes 等信息）
+        // 从jobClass创建实例并调用execute方法
+        String jobClass = def.getJobClass();
+        if (jobClass == null || jobClass.isEmpty()) {
+            throw new IllegalStateException("JobClass is null for task: " + def.getId());
+        }
+
+        try {
+            // 创建任务实例
+            Class<?> clazz = Class.forName(jobClass);
+            Object bean = clazz.newInstance();
+
+            // 查找execute方法
+            Method method = null;
+            try {
+                // 尝试查找带TaskContext参数的execute方法
+                method = clazz.getDeclaredMethod("execute", TaskContext.class);
+                method.setAccessible(true);
                 method.invoke(bean, context);
-            } else {
-                throw new IllegalStateException(
-                        "Unsupported task method signature: method parameter must be TaskContext, but got "
-                                + paramType.getName());
+            } catch (NoSuchMethodException e) {
+                // 尝试查找无参数的execute方法
+                method = clazz.getDeclaredMethod("execute");
+                method.setAccessible(true);
+                method.invoke(bean);
             }
-        } else {
-            // 不支持的签名，抛异常
-            throw new IllegalStateException(
-                    "Unsupported task method signature: method must have 0 or 1 parameter (TaskContext), but got "
-                            + method.getParameterCount());
+        } catch (ClassNotFoundException | InstantiationException | NoSuchMethodException e) {
+            throw new RuntimeException("Failed to execute task: " + def.getId(), e);
         }
     }
 

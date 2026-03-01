@@ -76,7 +76,6 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
      * @param persistenceProperties 持久化配置属性
      * @param tubaJobFactory        任务工厂，用于创建任务实例
      */
-    @Autowired
     public TaskSchedulerServiceImpl(TaskAdapter taskAdapter,
             TaskRegistry taskRegistry,
             Scheduler scheduler,
@@ -108,11 +107,23 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
         // 参数验证
         validateTask(task, definition);
         // 设置Task实例和方法
-        if (definition.getBean() == null) {
-            TaskDefinition newDefinition = taskAdapter.createTaskDefinition(task);
-            definition.setBean(newDefinition.getBean());
-            definition.setMethod(newDefinition.getMethod());
+        if (definition.getJobClass() == null) {
+            definition.setJobClass(task.getClass().getName());
         }
+        // 注册任务核心逻辑
+        return registerTaskCore(definition, true);
+    }
+
+    /**
+     * 注册任务（仅使用任务定义）
+     *
+     * @param definition 任务定义
+     * @return 注册成功的任务ID
+     */
+    @Override
+    public String registerTask(TaskDefinition definition) {
+        // 参数验证
+        validateDefinition(definition);
         // 注册任务核心逻辑
         return registerTaskCore(definition, true);
     }
@@ -131,12 +142,8 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
         }
         validateDefinition(definition);
 
-        // 设置TubaTask实例和方法
-        if (definition.getBean() == null) {
-            TaskDefinition newDefinition = taskAdapter.createTaskDefinition(task);
-            definition.setBean(newDefinition.getBean());
-            definition.setMethod(newDefinition.getMethod());
-            // 设置jobClass
+        // 设置jobClass
+        if (definition.getJobClass() == null) {
             definition.setJobClass(task.getClass().getName());
         }
         // 注册任务核心逻辑
@@ -154,7 +161,6 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
         validateCron(cron);
 
         TaskDefinition definition = createTaskDefinition(task, "-TubaTask-Cron");
-        definition.setCron(cron);
         String taskId = registerTask(task, definition);
         // 调度任务
         scheduler.schedule(definition);
@@ -172,9 +178,7 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
     public String registerTask(TubaTask task, long interval, TimeUnit timeUnit) {
         validateInterval(interval, timeUnit);
 
-        long millisInterval = TimeUtils.convertToMillis(interval, timeUnit);
         TaskDefinition definition = createTaskDefinition(task, "-TubaTask-FixedRate");
-        definition.setFixedRate(millisInterval);
         String taskId = registerTask(task, definition);
         // 调度任务
         scheduler.schedule(definition);
@@ -193,7 +197,6 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
         validateCron(cron);
 
         TaskDefinition definition = createTaskDefinition(task, "-Cron");
-        definition.setCron(cron);
         String taskId = registerTask(task, definition);
         // 调度任务
         scheduler.schedule(definition);
@@ -212,9 +215,7 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
     public String registerTask(Task task, long interval, TimeUnit timeUnit) {
         validateInterval(interval, timeUnit);
 
-        long millisInterval = TimeUtils.convertToMillis(interval, timeUnit);
         TaskDefinition definition = createTaskDefinition(task, "-FixedRate");
-        definition.setFixedRate(millisInterval);
         String taskId = registerTask(task, definition);
         // 调度任务
         scheduler.schedule(definition);
@@ -233,11 +234,11 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
     public String registerTask(Runnable runnable, TaskDefinition definition) {
         validateRunnable(runnable, definition);
 
-        // 设置Runnable实例和方法
-        if (definition.getBean() == null) {
-            TaskDefinition newDefinition = taskAdapter.createTaskDefinition(runnable);
-            definition.setBean(newDefinition.getBean());
-            definition.setMethod(newDefinition.getMethod());
+        // 对于Runnable类型，需要创建一个包装类并设置jobClass
+        if (definition.getJobClass() == null) {
+            // 创建一个包装Runnable的Task实现类
+            Task task = context -> runnable.run();
+            definition.setJobClass(task.getClass().getName());
         }
 
         // 注册任务核心逻辑
@@ -256,7 +257,6 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
         validateCron(cron);
 
         TaskDefinition definition = createTaskDefinition(runnable, "-Runnable-Cron");
-        definition.setCron(cron);
         String taskId = registerTask(runnable, definition);
         // 调度任务
         scheduler.schedule(definition);
@@ -275,9 +275,7 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
     public String registerTask(Runnable runnable, long interval, TimeUnit timeUnit) {
         validateInterval(interval, timeUnit);
 
-        long millisInterval = TimeUtils.convertToMillis(interval, timeUnit);
         TaskDefinition definition = createTaskDefinition(runnable, "-Runnable-FixedRate");
-        definition.setFixedRate(millisInterval);
         String taskId = registerTask(runnable, definition);
         // 调度任务
         scheduler.schedule(definition);
@@ -297,11 +295,17 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
     public <V> String registerTask(Callable<V> callable, TaskDefinition definition) {
         validateCallable(callable, definition);
 
-        // 设置Callable实例和方法
-        if (definition.getBean() == null) {
-            TaskDefinition newDefinition = taskAdapter.createTaskDefinition(callable);
-            definition.setBean(newDefinition.getBean());
-            definition.setMethod(newDefinition.getMethod());
+        // 对于Callable类型，需要创建一个包装类并设置jobClass
+        if (definition.getJobClass() == null) {
+            // 创建一个包装Callable的Task实现类
+            Task task = context -> {
+                try {
+                    callable.call();
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            };
+            definition.setJobClass(task.getClass().getName());
         }
 
         // 注册任务核心逻辑
@@ -321,7 +325,6 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
         validateCron(cron);
 
         TaskDefinition definition = createTaskDefinition(callable, "-Callable-Cron");
-        definition.setCron(cron);
         String taskId = registerTask(callable, definition);
         // 调度任务
         scheduler.schedule(definition);
@@ -341,9 +344,7 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
     public <V> String registerTask(Callable<V> callable, long interval, TimeUnit timeUnit) {
         validateInterval(interval, timeUnit);
 
-        long millisInterval = TimeUtils.convertToMillis(interval, timeUnit);
         TaskDefinition definition = createTaskDefinition(callable, "-Callable-FixedRate");
-        definition.setFixedRate(millisInterval);
         String taskId = registerTask(callable, definition);
         // 调度任务
         scheduler.schedule(definition);
@@ -502,7 +503,7 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
         persistTask(definition);
 
         // 记录日志
-        String taskType = isTaskType ? "任务" : (definition.getBean() instanceof Callable ? "Callable任务" : "Runnable任务");
+        String taskType = isTaskType ? "任务" : "Runnable/Callable任务";
         log.info("成功注册{}: {} (ID: {})", taskType, definition.getName(), definition.getId());
 
         return definition.getId();

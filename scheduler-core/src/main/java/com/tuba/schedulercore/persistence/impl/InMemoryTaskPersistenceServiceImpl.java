@@ -48,11 +48,10 @@ public class InMemoryTaskPersistenceServiceImpl implements TaskPersistenceServic
     public List<TaskDefinition> findTasksByNextFireTimeRange(LocalDateTime startTime, LocalDateTime endTime) {
         List<TaskDefinition> tasksInRange = new ArrayList<>();
         for (TaskDefinition task : taskMap.values()) {
-            if (task.isEnabled() && task.getNextFireTime() != null) {
-                LocalDateTime nextFireTime = task.getNextFireTime();
-                if (nextFireTime.isAfter(startTime) && nextFireTime.isBefore(endTime)) {
-                    tasksInRange.add(task);
-                }
+            if (task.isEnabled()) {
+                // 这里简化处理，实际应该从TaskStatus表中获取nextFireTime
+                //todo  暂时返回所有启用的任务
+                tasksInRange.add(task);
             }
         }
         return tasksInRange;

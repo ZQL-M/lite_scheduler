@@ -16,27 +16,6 @@ import java.util.concurrent.Callable;
 public class TaskAdapter {
 
     private static final Logger log = LoggerFactory.getLogger(TaskAdapter.class);
-    private static final Method EXECUTE_METHOD;
-    private static final Method RUNNABLE_TASK_EXECUTE_METHOD;
-    private static final Method CALLABLE_TASK_EXECUTE_METHOD;
-    private static final Method TUBA_TASK_EXECUTE_METHOD;
-
-    static {
-        try {
-            // 获取Task接口的execute方法
-            EXECUTE_METHOD = Task.class.getMethod("execute", TaskContext.class);
-            // 获取RunnableTaskWrapper的execute方法
-            RUNNABLE_TASK_EXECUTE_METHOD = RunnableTaskWrapper.class.getMethod("execute",
-                    TaskContext.class);
-            // 获取CallableTaskWrapper的execute方法
-            CALLABLE_TASK_EXECUTE_METHOD = CallableTaskWrapper.class.getMethod("execute",
-                    TaskContext.class);
-            // 获取TubaTask接口的execute方法
-            TUBA_TASK_EXECUTE_METHOD = TubaTask.class.getMethod("execute", TaskContext.class);
-        } catch (NoSuchMethodException e) {
-            throw new RuntimeException("Failed to get execute method from Task interface", e);
-        }
-    }
 
     /**
      * 创建TaskDefinition
@@ -50,8 +29,6 @@ public class TaskAdapter {
         }
 
         TaskDefinition definition = new TaskDefinition();
-        definition.setBean(task);
-        definition.setMethod(EXECUTE_METHOD);
 
         // 处理lambda表达式，获取原始类名
         String className = getOriginalClassName(task);
@@ -125,9 +102,6 @@ public class TaskAdapter {
         }
 
         TaskDefinition definition = new TaskDefinition();
-        RunnableTaskWrapper taskWrapper = new RunnableTaskWrapper(runnable);
-        definition.setBean(taskWrapper);
-        definition.setMethod(RUNNABLE_TASK_EXECUTE_METHOD);
 
         // 处理lambda表达式，获取原始类名
         String className = getOriginalClassName(runnable);
@@ -149,9 +123,6 @@ public class TaskAdapter {
         }
 
         TaskDefinition definition = new TaskDefinition();
-        CallableTaskWrapper<V> taskWrapper = new CallableTaskWrapper<>(callable);
-        definition.setBean(taskWrapper);
-        definition.setMethod(CALLABLE_TASK_EXECUTE_METHOD);
 
         // 处理lambda表达式，获取原始类名
         String className = getOriginalClassName(callable);
@@ -173,8 +144,6 @@ public class TaskAdapter {
         }
 
         TaskDefinition definition = new TaskDefinition();
-        definition.setBean(task);
-        definition.setMethod(TUBA_TASK_EXECUTE_METHOD);
         definition.setJobClass(task.getClass().getName());
 
         // 处理lambda表达式，获取原始类名
@@ -185,39 +154,4 @@ public class TaskAdapter {
         return definition;
     }
 
-    /**
-     * Runnable的包装类，将Runnable转换为Task接口
-     */
-    private static class RunnableTaskWrapper implements Task {
-        private final Runnable runnable;
-
-        public RunnableTaskWrapper(Runnable runnable) {
-            this.runnable = runnable;
-        }
-
-        @Override
-        public void execute(TaskContext context) {
-            runnable.run();
-        }
-    }
-
-    /**
-     * Callable的包装类，将Callable转换为Task接口
-     */
-    private static class CallableTaskWrapper<V> implements Task {
-        private final Callable<V> callable;
-
-        public CallableTaskWrapper(Callable<V> callable) {
-            this.callable = callable;
-        }
-
-        @Override
-        public void execute(TaskContext context) {
-            try {
-                callable.call();
-            } catch (Exception e) {
-                throw new RuntimeException("Callable task execution failed", e);
-            }
-        }
-    }
 }

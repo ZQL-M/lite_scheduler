@@ -93,28 +93,14 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
         // 创建任务执行逻辑
         Runnable taskRunnable = createTaskRunnable(definition);
 
-        ScheduledFuture<?> future;
-
-        // 1. 检查固定频率配置
-        long fixedRate = definition.getFixedRate();
-        if (fixedRate > 0) {
-            future = scheduleFixedRateTask(definition, taskRunnable);
-        }
-        // 2. 检查固定延迟配置
-        else if (definition.getFixedDelay() > 0) {
-            future = scheduleFixedDelayTask(definition, taskRunnable);
-        }
-        // 3. 检查 Cron 表达式配置
-        else if (StringUtils.hasText(definition.getCron())) {
-            future = scheduleCronTask(definition, taskRunnable);
-        }
-        // 无有效配置
-        else {
-            log.error("Task {} has no valid scheduling configuration", definition.getId());
-            return;
-        }
+        // todo 暂时使用默认的固定频率调度
+        // 实际应该从TaskTrigger表中获取调度配置
+        long defaultInterval = 60000; // 默认1分钟
+        ScheduledFuture<?> future = taskScheduler.scheduleAtFixedRate(
+                taskRunnable, Instant.now(), Duration.ofMillis(defaultInterval));
 
         scheduledFutures.put(definition.getId(), future);
+        log.info("Scheduled task {} with default interval: {}ms", definition.getId(), defaultInterval);
     }
 
     /**
@@ -151,15 +137,6 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
      * @param definition 任务定义
      */
     private void executeTask(TaskDefinition definition) {
-        // 更新任务的last_fire_time为当前时间
-        Instant now = Instant.now();
-        LocalDateTime lastFireTime = LocalDateTime.ofInstant(now, DEFAULT_ZONE);
-        definition.setLastFireTime(lastFireTime);
-
-        // 计算下次触发时间
-        LocalDateTime nextFireTime = calculateNextFireTime(definition, lastFireTime);
-        definition.setNextFireTime(nextFireTime);
-
         // 执行任务
         TaskContext ctx = new TaskContext(definition);
         taskExecutor.execute(ctx);
@@ -169,125 +146,9 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
                 k -> new AtomicInteger(0));
         int currentCount = count.incrementAndGet();
 
-        // 检查是否达到最大执行次数
-        int repeatCount = definition.getRepeatCount();
-        if (repeatCount != INFINITE_REPEAT) {
-            // 更新任务的剩余执行次数
-            int remainingCount = Math.max(0, repeatCount - currentCount);
-            definition.setRepeatCount(remainingCount);
-
-            if (currentCount >= repeatCount) {
-                // 任务已完成所有执行次数，更新状态为已完成
-                definition.setStatus(TaskStatus.COMPLETED);
-                log.info(
-                        "Task {} has reached maximum execution count of {} (executed {} times). Unscheduling task.",
-                        definition.getId(), repeatCount, currentCount);
-                unschedule(definition.getId());
-            }
-        }
-    }
-
-    /**
-     * 调度固定频率任务
-     * 
-     * @param definition 任务定义
-     * @param runnable   任务执行逻辑
-     * @return ScheduledFuture实例
-     */
-    private ScheduledFuture<?> scheduleFixedRateTask(TaskDefinition definition, Runnable runnable) {
-        long fixedRate = definition.getFixedRate();
-        log.debug("Scheduling task {} with fixed rate: {}ms", definition.getId(), fixedRate);
-
-        // 检查是否为一次性任务
-        if (definition.getRepeatCount() == 1) {
-            return scheduleOneTimeTask(definition, runnable);
-        }
-        // 多次执行任务，使用固定频率
-        else {
-            return taskScheduler.scheduleAtFixedRate(runnable, Instant.now(),
-                    Duration.ofMillis(fixedRate));
-        }
-    }
-
-    /**
-     * 调度固定延迟任务
-     * 
-     * @param definition 任务定义
-     * @param runnable   任务执行逻辑
-     * @return ScheduledFuture实例
-     */
-    private ScheduledFuture<?> scheduleFixedDelayTask(TaskDefinition definition, Runnable runnable) {
-        long fixedDelay = definition.getFixedDelay();
-        log.debug("Scheduling task {} with fixed delay: {}ms", definition.getId(), fixedDelay);
-
-        // 检查是否为一次性任务
-        if (definition.getRepeatCount() == 1) {
-            return scheduleOneTimeTask(definition, runnable);
-        }
-        // 多次执行任务，使用固定延迟
-        else {
-            return taskScheduler.scheduleWithFixedDelay(runnable, Instant.now(),
-                    Duration.ofMillis(fixedDelay));
-        }
-    }
-
-    /**
-     * 调度一次性任务
-     * 
-     * @param definition 任务定义
-     * @param runnable   任务执行逻辑
-     * @return ScheduledFuture实例
-     */
-    private ScheduledFuture<?> scheduleOneTimeTask(TaskDefinition definition, Runnable runnable) {
-        LocalDateTime nextFireTime = definition.getNextFireTime();
-        if (nextFireTime != null) {
-            // 将LocalDateTime转换为Instant
-            Instant startTime = nextFireTime.atZone(DEFAULT_ZONE).toInstant();
-            log.debug("Task {} is one-time task, scheduling at: {}", definition.getId(), nextFireTime);
-            return taskScheduler.schedule(runnable, startTime);
-        } else {
-            // 如果没有nextFireTime，使用立即执行
-            return taskScheduler.schedule(runnable, Instant.now());
-        }
-    }
-
-    /**
-     * 调度Cron表达式任务
-     * 
-     * @param definition 任务定义
-     * @param runnable   任务执行逻辑
-     * @return ScheduledFuture实例
-     */
-    private ScheduledFuture<?> scheduleCronTask(TaskDefinition definition, Runnable runnable) {
-        String cron = definition.getCron();
-        log.debug("Scheduling task {} with cron: {}", definition.getId(), cron);
-
-        Trigger trigger = createCronTrigger(cron);
-        return taskScheduler.schedule(runnable, trigger);
-    }
-
-    /**
-     * 创建CronTrigger实例
-     * 
-     * @param cron
-     * @return
-     */
-    private Trigger createCronTrigger(String cron) {
-        // 尝试解析为数字秒（固定频率）
-        try {
-            long seconds = Long.parseLong(cron.trim());
-            if (seconds > 0) {
-                // 使用固定频率调度（每 N 秒执行一次）
-                PeriodicTrigger periodicTrigger = new PeriodicTrigger(seconds * 1000); // 转换为毫秒
-                periodicTrigger.setFixedRate(true); // 固定频率，不是固定延迟
-                return periodicTrigger;
-            }
-        } catch (NumberFormatException e) {
-            // 不是有效数字，继续使用Cron表达式
-        }
-
-        // 使用Cron表达式
-        return new CronTrigger(cron);
+        // 注意：任务状态和调度信息现在存储在TaskStatus和TaskTrigger表中
+        // 这里只记录执行次数，实际的状态更新应该在任务执行完成后通过持久化服务更新
+        log.debug("Task {} executed {} times", definition.getId(), currentCount);
     }
 
     /**
@@ -389,54 +250,5 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
         // 立即触发任务执行，不加入调度计划
         TaskContext ctx = new TaskContext(definition);
         taskExecutor.execute(ctx);
-    }
-
-    /**
-     * 计算任务的下次触发时间
-     * 
-     * @param definition   任务定义
-     * @param lastFireTime 上次触发时间
-     * @return 下次触发时间
-     */
-    private LocalDateTime calculateNextFireTime(TaskDefinition definition, LocalDateTime lastFireTime) {
-        // 1. 固定频率
-        long fixedRate = definition.getFixedRate();
-        if (fixedRate > 0) {
-            return lastFireTime.plus(Duration.ofMillis(fixedRate));
-        }
-
-        // 2. 固定延迟
-        long fixedDelay = definition.getFixedDelay();
-        if (fixedDelay > 0) {
-            return lastFireTime.plus(Duration.ofMillis(fixedDelay));
-        }
-
-        // 3. Cron表达式
-        String cron = definition.getCron();
-        if (StringUtils.hasText(cron)) {
-            try {
-                // 尝试解析为数字秒（固定频率）
-                long seconds = Long.parseLong(cron.trim());
-                if (seconds > 0) {
-                    // 数字秒，使用固定频率计算
-                    return lastFireTime.plusSeconds(seconds);
-                }
-            } catch (NumberFormatException e) {
-                // 不是数字，尝试作为完整cron表达式解析
-            }
-
-            try {
-                // 使用Spring的CronExpression解析器计算下次触发时间
-                org.springframework.scheduling.support.CronExpression cronExpression = org.springframework.scheduling.support.CronExpression
-                        .parse(cron);
-                return cronExpression.next(lastFireTime);
-            } catch (IllegalArgumentException e) {
-                log.error("Invalid cron expression: {}, using default delay of {}s", cron, DEFAULT_DELAY_SECONDS, e);
-                return lastFireTime.plusSeconds(DEFAULT_DELAY_SECONDS);
-            }
-        }
-
-        // 默认立即执行
-        return lastFireTime;
     }
 }

@@ -18,6 +18,14 @@ public interface TaskSchedulerService {
      * @return 任务ID
      */
     String registerTask(Task task, TaskDefinition definition);
+    
+    /**
+     * 注册任务（仅使用任务定义）
+     * 
+     * @param definition 任务定义
+     * @return 任务ID
+     */
+    String registerTask(TaskDefinition definition);
 
     /**
      * 使用cron表达式注册任务
