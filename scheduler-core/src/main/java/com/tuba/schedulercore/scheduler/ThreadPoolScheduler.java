@@ -1,26 +1,25 @@
 package com.tuba.schedulercore.scheduler;
 
 import com.tuba.schedulercore.config.ExecutorProperties;
-import com.tuba.schedulercore.enums.TaskStatus;
 import com.tuba.schedulercore.executor.TaskExecutor;
 import com.tuba.schedulercore.model.TaskContext;
 import com.tuba.schedulercore.model.TaskDefinition;
-
+import com.tuba.schedulercore.model.TaskTrigger;
+import com.tuba.schedulercore.model.SimpleTrigger;
+import com.tuba.schedulercore.service.TaskTriggerService;
+import com.tuba.schedulercore.service.TaskStatusService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.DisposableBean;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.Trigger;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.scheduling.support.CronTrigger;
-import org.springframework.scheduling.support.PeriodicTrigger;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -47,13 +46,18 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
 
     private final ThreadPoolTaskScheduler taskScheduler;
     private final TaskExecutor taskExecutor;
+    private final TaskTriggerService taskTriggerService;
+    private final TaskStatusService taskStatusService;
     // 保存 ScheduledFuture 以便取消任务
     private final Map<String, ScheduledFuture<?>> scheduledFutures = new ConcurrentHashMap<>();
     // 保存任务执行次数，使用AtomicInteger保证线程安全
     private final Map<String, AtomicInteger> taskExecutionCounts = new ConcurrentHashMap<>();
 
-    public ThreadPoolScheduler(TaskExecutor taskExecutor, ExecutorProperties properties) {
+    public ThreadPoolScheduler(TaskExecutor taskExecutor, ExecutorProperties properties,
+            TaskTriggerService taskTriggerService, TaskStatusService taskStatusService) {
         this.taskExecutor = taskExecutor;
+        this.taskTriggerService = taskTriggerService;
+        this.taskStatusService = taskStatusService;
         this.taskScheduler = new ThreadPoolTaskScheduler();
 
         // 使用Optional简化null检查
@@ -93,14 +97,87 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
         // 创建任务执行逻辑
         Runnable taskRunnable = createTaskRunnable(definition);
 
-        // todo 暂时使用默认的固定频率调度
-        // 实际应该从TaskTrigger表中获取调度配置
-        long defaultInterval = 60000; // 默认1分钟
-        ScheduledFuture<?> future = taskScheduler.scheduleAtFixedRate(
-                taskRunnable, Instant.now(), Duration.ofMillis(defaultInterval));
+        // 从TaskTrigger表中获取调度配置
+        List<TaskTrigger> triggers = taskTriggerService.findByTaskId(definition.getId());
+        if (triggers == null || triggers.isEmpty()) {
+            // 没有找到触发器，使用默认配置
+            log.warn("No trigger found for task {}, using default configuration", definition.getId());
+            long defaultInterval = 60000; // 默认1分钟
+            ScheduledFuture<?> future = taskScheduler.scheduleAtFixedRate(
+                    taskRunnable, Instant.now(), Duration.ofMillis(defaultInterval));
+            scheduledFutures.put(definition.getId(), future);
+            log.info("Scheduled task {} with default interval: {}ms", definition.getId(), defaultInterval);
+            return;
+        }
 
-        scheduledFutures.put(definition.getId(), future);
-        log.info("Scheduled task {} with default interval: {}ms", definition.getId(), defaultInterval);
+        // 处理每个触发器
+        for (TaskTrigger trigger : triggers) {
+            if (!trigger.isEnabled()) {
+                log.debug("Trigger {} for task {} is disabled, skipping", trigger.getId(), definition.getId());
+                continue;
+            }
+
+            // 检查触发器是否在有效期内
+            if (!isTriggerValid(trigger)) {
+                log.debug("Trigger {} for task {} is not valid, skipping", trigger.getId(), definition.getId());
+                continue;
+            }
+
+            // 根据触发器类型创建调度
+            ScheduledFuture<?> future = null;
+            if ("CRON".equals(trigger.getTriggerType())) {
+                // 处理Cron触发器
+                com.tuba.schedulercore.model.CronTrigger cronTrigger = taskTriggerService
+                        .findCronTriggerByTriggerId(trigger.getId());
+                if (cronTrigger != null) {
+                    future = taskScheduler.schedule(
+                            taskRunnable,
+                            new org.springframework.scheduling.support.CronTrigger(cronTrigger.getCronExpression()));
+                    log.info("Scheduled task {} with cron expression: {}", definition.getId(),
+                            cronTrigger.getCronExpression());
+                }
+            } else if ("FIXED_RATE".equals(trigger.getTriggerType())
+                    || "FIXED_DELAY".equals(trigger.getTriggerType())) {
+                // 处理Simple触发器
+                SimpleTrigger simpleTrigger = taskTriggerService.findSimpleTriggerByTriggerId(trigger.getId());
+                if (simpleTrigger != null) {
+                    if ("FIXED_RATE".equals(simpleTrigger.getSimpleType())) {
+                        future = taskScheduler.scheduleAtFixedRate(
+                                taskRunnable,
+                                Instant.now(),
+                                Duration.ofMillis(simpleTrigger.getRepeatInterval()));
+                    } else if ("FIXED_DELAY".equals(simpleTrigger.getSimpleType())) {
+                        future = taskScheduler.scheduleWithFixedDelay(
+                                taskRunnable,
+                                Instant.now(),
+                                Duration.ofMillis(simpleTrigger.getRepeatInterval()));
+                    }
+                    log.info("Scheduled task {} with {} interval: {}ms",
+                            definition.getId(), simpleTrigger.getSimpleType(), simpleTrigger.getRepeatInterval());
+                }
+            }
+
+            if (future != null) {
+                scheduledFutures.put(definition.getId(), future);
+            }
+        }
+    }
+
+    /**
+     * 检查触发器是否在有效期内
+     *
+     * @param trigger 触发器
+     * @return 是否有效
+     */
+    private boolean isTriggerValid(TaskTrigger trigger) {
+        LocalDateTime now = LocalDateTime.now();
+        if (trigger.getStartTime() != null && now.isBefore(trigger.getStartTime())) {
+            return false;
+        }
+        if (trigger.getEndTime() != null && now.isAfter(trigger.getEndTime())) {
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -146,8 +223,19 @@ public class ThreadPoolScheduler implements Scheduler, DisposableBean {
                 k -> new AtomicInteger(0));
         int currentCount = count.incrementAndGet();
 
-        // 注意：任务状态和调度信息现在存储在TaskStatus和TaskTrigger表中
-        // 这里只记录执行次数，实际的状态更新应该在任务执行完成后通过持久化服务更新
+        // 更新任务状态到数据库
+        try {
+            // 获取任务状态
+            com.tuba.schedulercore.model.TaskStatus taskStatus = taskStatusService.getStatus(definition.getId());
+            if (taskStatus != null) {
+                // 更新执行次数
+                taskStatus.setTotalExecutions(taskStatus.getTotalExecutions() + 1);
+                taskStatusService.updateStatus(taskStatus);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to update task status for task {}", definition.getId(), e);
+        }
+
         log.debug("Task {} executed {} times", definition.getId(), currentCount);
     }
 

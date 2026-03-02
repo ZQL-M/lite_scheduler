@@ -1,9 +1,10 @@
-package com.tuba.schedulercore.scheduler;
+package com.tuba.schedulercore.scanner;
 
 import com.tuba.schedulercore.config.ScannerProperties;
 import com.tuba.schedulercore.model.TaskDefinition;
 import com.tuba.schedulercore.persistence.TaskPersistenceService;
 import com.tuba.schedulercore.registry.TaskRegistry;
+import com.tuba.schedulercore.scheduler.Scheduler;
 import com.tuba.schedulercore.task.TubaJobFactory;
 import com.tuba.schedulercore.utils.TaskUtils;
 import org.slf4j.Logger;
