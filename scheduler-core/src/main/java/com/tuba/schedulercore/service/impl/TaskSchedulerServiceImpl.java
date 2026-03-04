@@ -1,20 +1,18 @@
 package com.tuba.schedulercore.service.impl;
 
-import com.tuba.schedulercore.config.PersistenceProperties;
+import com.tuba.schedulercore.config.properties.PersistenceProperties;
 import com.tuba.schedulercore.enums.TimeUnit;
 import com.tuba.schedulercore.model.TaskDefinition;
-import com.tuba.schedulercore.persistence.TaskPersistenceService;
-import com.tuba.schedulercore.registry.TaskRegistry;
-import com.tuba.schedulercore.scheduler.Scheduler;
+import com.tuba.schedulercore.core.persistence.TaskPersistenceService;
+import com.tuba.schedulercore.core.registry.TaskRegistry;
+import com.tuba.schedulercore.core.scheduler.Scheduler;
 import com.tuba.schedulercore.service.TaskSchedulerService;
-import com.tuba.schedulercore.task.Task;
-import com.tuba.schedulercore.task.TaskAdapter;
-import com.tuba.schedulercore.task.TubaJobFactory;
-import com.tuba.schedulercore.task.TubaTask;
-import com.tuba.schedulercore.utils.TimeUtils;
+import com.tuba.schedulercore.core.task.Task;
+import com.tuba.schedulercore.core.task.TaskAdapter;
+import com.tuba.schedulercore.core.task.TubaJobFactory;
+import com.tuba.schedulercore.core.task.TubaTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

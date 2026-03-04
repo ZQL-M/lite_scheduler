@@ -1,8 +1,12 @@
 package com.tuba.schedulercore.config;
 
-import com.tuba.schedulercore.persistence.TaskPersistenceService;
-import com.tuba.schedulercore.persistence.impl.DatabaseTaskPersistenceServiceImpl;
-import com.tuba.schedulercore.persistence.impl.InMemoryTaskPersistenceServiceImpl;
+import com.tuba.schedulercore.config.properties.ExecutorProperties;
+import com.tuba.schedulercore.config.properties.PersistenceProperties;
+import com.tuba.schedulercore.config.properties.RecoveryProperties;
+import com.tuba.schedulercore.config.properties.ScannerProperties;
+import com.tuba.schedulercore.core.persistence.TaskPersistenceService;
+import com.tuba.schedulercore.core.persistence.impl.DatabaseTaskPersistenceServiceImpl;
+import com.tuba.schedulercore.core.persistence.impl.InMemoryTaskPersistenceServiceImpl;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

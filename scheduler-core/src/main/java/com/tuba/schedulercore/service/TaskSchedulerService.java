@@ -2,14 +2,16 @@ package com.tuba.schedulercore.service;
 
 import com.tuba.schedulercore.enums.TimeUnit;
 import com.tuba.schedulercore.model.TaskDefinition;
-import com.tuba.schedulercore.task.Task;
+import com.tuba.schedulercore.core.task.Task;
 
 import java.util.concurrent.Callable;
 
 /**
  * 任务调度服务接口，提供编程式API用于任务管理
+ * todo 注册任务接口需要优化调整，task与tubaTask重复了
  */
 public interface TaskSchedulerService {
+    //todo 筛选对应的注册任务，有些参数应该是从对应model类获取
     /**
      * 注册任务
      * 

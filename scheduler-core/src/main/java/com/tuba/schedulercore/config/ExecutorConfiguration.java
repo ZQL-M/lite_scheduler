@@ -1,5 +1,6 @@
 package com.tuba.schedulercore.config;
 
+import com.tuba.schedulercore.config.properties.ExecutorProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 

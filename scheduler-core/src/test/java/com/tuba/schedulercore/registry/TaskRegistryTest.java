@@ -1,5 +1,6 @@
 package com.tuba.schedulercore.registry;
 
+import com.tuba.schedulercore.core.registry.TaskRegistry;
 import com.tuba.schedulercore.model.TaskDefinition;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
