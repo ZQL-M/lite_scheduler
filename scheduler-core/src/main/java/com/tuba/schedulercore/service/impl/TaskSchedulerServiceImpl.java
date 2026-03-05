@@ -1,16 +1,15 @@
 package com.tuba.schedulercore.service.impl;
 
 import com.tuba.schedulercore.config.properties.PersistenceProperties;
+import com.tuba.schedulercore.core.task.TubaTask;
 import com.tuba.schedulercore.enums.TimeUnit;
 import com.tuba.schedulercore.model.TaskDefinition;
 import com.tuba.schedulercore.core.persistence.TaskPersistenceService;
 import com.tuba.schedulercore.core.registry.TaskRegistry;
 import com.tuba.schedulercore.core.scheduler.Scheduler;
 import com.tuba.schedulercore.service.TaskSchedulerService;
-import com.tuba.schedulercore.core.task.Task;
 import com.tuba.schedulercore.core.task.TaskAdapter;
 import com.tuba.schedulercore.core.task.TubaJobFactory;
-import com.tuba.schedulercore.core.task.TubaTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -96,17 +95,17 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
     /**
      * 注册Task类型任务
      *
-     * @param task       Task任务实例
+     * @param tubaTask       Task任务实例
      * @param definition 任务定义
      * @return 注册成功的任务ID
      */
     @Override
-    public String registerTask(Task task, TaskDefinition definition) {
+    public String registerTask(TubaTask tubaTask, TaskDefinition definition) {
         // 参数验证
-        validateTask(task, definition);
+        validateTask(tubaTask, definition);
         // 设置Task实例和方法
         if (definition.getJobClass() == null) {
-            definition.setJobClass(task.getClass().getName());
+            definition.setJobClass(tubaTask.getClass().getName());
         }
         // 注册任务核心逻辑
         return registerTaskCore(definition, true);
@@ -127,75 +126,18 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
     }
 
     /**
-     * 注册TubaTask类型任务
-     *
-     * @param task       TubaTask任务实例
-     * @param definition 任务定义
-     * @return 注册成功的任务ID
-     */
-    public String registerTask(TubaTask task, TaskDefinition definition) {
-        // 参数验证
-        if (task == null) {
-            throw new IllegalArgumentException("TubaTask cannot be null");
-        }
-        validateDefinition(definition);
-
-        // 设置jobClass
-        if (definition.getJobClass() == null) {
-            definition.setJobClass(task.getClass().getName());
-        }
-        // 注册任务核心逻辑
-        return registerTaskCore(definition, true);
-    }
-
-    /**
-     * 使用Cron表达式注册TubaTask类型任务
-     *
-     * @param task TubaTask任务实例
-     * @param cron Cron表达式
-     * @return 注册成功的任务ID
-     */
-    public String registerTask(TubaTask task, String cron) {
-        validateCron(cron);
-
-        TaskDefinition definition = createTaskDefinition(task, "-TubaTask-Cron");
-        String taskId = registerTask(task, definition);
-        // 调度任务
-        scheduler.schedule(definition);
-        return taskId;
-    }
-
-    /**
-     * 使用固定频率注册TubaTask类型任务
-     *
-     * @param task     TubaTask任务实例
-     * @param interval 时间间隔
-     * @param timeUnit 时间单位
-     * @return 注册成功的任务ID
-     */
-    public String registerTask(TubaTask task, long interval, TimeUnit timeUnit) {
-        validateInterval(interval, timeUnit);
-
-        TaskDefinition definition = createTaskDefinition(task, "-TubaTask-FixedRate");
-        String taskId = registerTask(task, definition);
-        // 调度任务
-        scheduler.schedule(definition);
-        return taskId;
-    }
-
-    /**
      * 使用Cron表达式注册Task类型任务
      *
-     * @param task Task任务实例
+     * @param tubaTask Task任务实例
      * @param cron Cron表达式
      * @return 注册成功的任务ID
      */
     @Override
-    public String registerTask(Task task, String cron) {
+    public String registerTask(TubaTask tubaTask, String cron) {
         validateCron(cron);
 
-        TaskDefinition definition = createTaskDefinition(task, "-Cron");
-        String taskId = registerTask(task, definition);
+        TaskDefinition definition = createTaskDefinition(tubaTask, "-Cron");
+        String taskId = registerTask(tubaTask, definition);
         // 调度任务
         scheduler.schedule(definition);
         return taskId;
@@ -204,17 +146,17 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
     /**
      * 使用固定频率注册Task类型任务
      *
-     * @param task     Task任务实例
+     * @param tubaTask     Task任务实例
      * @param interval 时间间隔
      * @param timeUnit 时间单位
      * @return 注册成功的任务ID
      */
     @Override
-    public String registerTask(Task task, long interval, TimeUnit timeUnit) {
+    public String registerTask(TubaTask tubaTask, long interval, TimeUnit timeUnit) {
         validateInterval(interval, timeUnit);
 
-        TaskDefinition definition = createTaskDefinition(task, "-FixedRate");
-        String taskId = registerTask(task, definition);
+        TaskDefinition definition = createTaskDefinition(tubaTask, "-FixedRate");
+        String taskId = registerTask(tubaTask, definition);
         // 调度任务
         scheduler.schedule(definition);
         return taskId;
@@ -235,8 +177,8 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
         // 对于Runnable类型，需要创建一个包装类并设置jobClass
         if (definition.getJobClass() == null) {
             // 创建一个包装Runnable的Task实现类
-            Task task = context -> runnable.run();
-            definition.setJobClass(task.getClass().getName());
+            TubaTask tubaTask = context -> runnable.run();
+            definition.setJobClass(tubaTask.getClass().getName());
         }
 
         // 注册任务核心逻辑
@@ -296,14 +238,14 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
         // 对于Callable类型，需要创建一个包装类并设置jobClass
         if (definition.getJobClass() == null) {
             // 创建一个包装Callable的Task实现类
-            Task task = context -> {
+            TubaTask tubaTask = context -> {
                 try {
                     callable.call();
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
             };
-            definition.setJobClass(task.getClass().getName());
+            definition.setJobClass(tubaTask.getClass().getName());
         }
 
         // 注册任务核心逻辑
@@ -590,12 +532,12 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
     /**
      * 参数验证：Task类型
      *
-     * @param task       Task任务实例
+     * @param tubaTask       Task任务实例
      * @param definition 任务定义
      * @throws IllegalArgumentException 如果参数无效
      */
-    private void validateTask(Task task, TaskDefinition definition) {
-        if (task == null) {
+    private void validateTask(TubaTask tubaTask, TaskDefinition definition) {
+        if (tubaTask == null) {
             throw new IllegalArgumentException("Task cannot be null");
         }
         validateDefinition(definition);

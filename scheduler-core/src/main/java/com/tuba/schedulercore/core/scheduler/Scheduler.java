@@ -1,7 +1,7 @@
 package com.tuba.schedulercore.core.scheduler;
 
-import com.tuba.schedulercore.enums.SchedulerStatus;
 import com.tuba.schedulercore.core.trigger.Trigger;
+import com.tuba.schedulercore.enums.SchedulerStatus;
 import com.tuba.schedulercore.model.TaskDefinition;
 
 /**

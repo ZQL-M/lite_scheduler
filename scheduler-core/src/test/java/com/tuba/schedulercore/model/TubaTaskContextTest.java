@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * TaskContext 测试类
  * 验证 putAttribute 和 getAttribute 方法
  */
-class TaskContextTest {
+class TubaTaskContextTest {
 
     @Test
     void testPutAndGetAttribute() {

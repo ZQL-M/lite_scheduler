@@ -16,27 +16,6 @@ public class TaskAdapter {
     private static final Logger log = LoggerFactory.getLogger(TaskAdapter.class);
 
     /**
-     * 创建TaskDefinition
-     * 
-     * @param task Task实例
-     * @return TaskDefinition
-     */
-    public TaskDefinition createTaskDefinition(Task task) {
-        if (task == null) {
-            throw new IllegalArgumentException("Task cannot be null");
-        }
-
-        TaskDefinition definition = new TaskDefinition();
-
-        // 处理lambda表达式，获取原始类名
-        String className = getOriginalClassName(task);
-        definition.setName(className);
-        definition.setDescription("Programmatically registered task");
-
-        return definition;
-    }
-
-    /**
      * 获取对象的原始类名，处理lambda表达式
      * 
      * @param obj 对象
@@ -131,23 +110,23 @@ public class TaskAdapter {
     }
 
     /**
-     * 创建TubaTask类型的TaskDefinition
+     * 创建Task类型的TaskDefinition
      * 
-     * @param task TubaTask实例
+     * @param tubaTask Task实例
      * @return TaskDefinition
      */
-    public TaskDefinition createTaskDefinition(TubaTask task) {
-        if (task == null) {
-            throw new IllegalArgumentException("TubaTask cannot be null");
+    public TaskDefinition createTaskDefinition(TubaTask tubaTask) {
+        if (tubaTask == null) {
+            throw new IllegalArgumentException("Task cannot be null");
         }
 
         TaskDefinition definition = new TaskDefinition();
-        definition.setJobClass(task.getClass().getName());
+        definition.setJobClass(tubaTask.getClass().getName());
 
         // 处理lambda表达式，获取原始类名
-        String className = getOriginalClassName(task);
+        String className = getOriginalClassName(tubaTask);
         definition.setName(className);
-        definition.setDescription("TubaTask");
+        definition.setDescription("Task");
 
         return definition;
     }

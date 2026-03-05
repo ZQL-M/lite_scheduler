@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * TaskRegistry 测试类
  * 验证 enable/disable 方法
  */
-class TaskRegistryTest {
+class TubaTaskRegistryTest {
 
     private TaskRegistry registry;
     private TaskDefinition task1;

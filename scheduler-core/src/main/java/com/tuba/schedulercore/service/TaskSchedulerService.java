@@ -1,8 +1,8 @@
 package com.tuba.schedulercore.service;
 
+import com.tuba.schedulercore.core.task.TubaTask;
 import com.tuba.schedulercore.enums.TimeUnit;
 import com.tuba.schedulercore.model.TaskDefinition;
-import com.tuba.schedulercore.core.task.Task;
 
 import java.util.concurrent.Callable;
 
@@ -11,16 +11,16 @@ import java.util.concurrent.Callable;
  * todo 注册任务接口需要优化调整，task与tubaTask重复了
  */
 public interface TaskSchedulerService {
-    //todo 筛选对应的注册任务，有些参数应该是从对应model类获取
+    // todo 筛选对应的注册任务，有些参数应该是从对应model类获取
     /**
      * 注册任务
      * 
-     * @param task       Task实例
+     * @param tubaTask       Task实例
      * @param definition 任务定义
      * @return 任务ID
      */
-    String registerTask(Task task, TaskDefinition definition);
-    
+    String registerTask(TubaTask tubaTask, TaskDefinition definition);
+
     /**
      * 注册任务（仅使用任务定义）
      * 
@@ -32,21 +32,21 @@ public interface TaskSchedulerService {
     /**
      * 使用cron表达式注册任务
      * 
-     * @param task Task实例
+     * @param tubaTask Task实例
      * @param cron cron表达式
      * @return 任务ID
      */
-    String registerTask(Task task, String cron);
+    String registerTask(TubaTask tubaTask, String cron);
 
     /**
      * 使用固定频率注册任务
      * 
-     * @param task     Task实例
+     * @param tubaTask     Task实例
      * @param interval 时间间隔
      * @param timeUnit 时间单位
      * @return 任务ID
      */
-    String registerTask(Task task, long interval, TimeUnit timeUnit);
+    String registerTask(TubaTask tubaTask, long interval, TimeUnit timeUnit);
 
     /**
      * 使用Runnable注册任务

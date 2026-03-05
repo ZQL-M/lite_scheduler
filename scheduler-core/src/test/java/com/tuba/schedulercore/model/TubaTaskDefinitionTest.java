@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * TaskDefinition 测试类
  * 验证 enabled 字段和 equals/hashCode 方法
  */
-class TaskDefinitionTest {
+class TubaTaskDefinitionTest {
 
     @Test
     void testEnabledField() {
