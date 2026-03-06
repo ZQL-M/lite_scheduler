@@ -15,7 +15,7 @@ public interface TaskSchedulerService {
     /**
      * 注册任务
      * 
-     * @param tubaTask       Task实例
+     * @param tubaTask   Task实例
      * @param definition 任务定义
      * @return 任务ID
      */
@@ -33,7 +33,7 @@ public interface TaskSchedulerService {
      * 使用cron表达式注册任务
      * 
      * @param tubaTask Task实例
-     * @param cron cron表达式
+     * @param cron     cron表达式
      * @return 任务ID
      */
     String registerTask(TubaTask tubaTask, String cron);
@@ -41,7 +41,7 @@ public interface TaskSchedulerService {
     /**
      * 使用固定频率注册任务
      * 
-     * @param tubaTask     Task实例
+     * @param tubaTask Task实例
      * @param interval 时间间隔
      * @param timeUnit 时间单位
      * @return 任务ID
@@ -139,4 +139,30 @@ public interface TaskSchedulerService {
      * @return 任务定义
      */
     TaskDefinition getTaskDefinition(String taskId);
+
+    /**
+     * 注册TubaTask类型任务（带配置）
+     * 
+     * @param tubaTask      TubaTask任务实例
+     * @param definition    任务定义
+     * @param timeout       超时时间（毫秒）
+     * @param retryCount    重试次数
+     * @param retryInterval 重试间隔（毫秒）
+     * @return 注册成功的任务ID
+     */
+    String registerTask(TubaTask tubaTask, TaskDefinition definition,
+            Long timeout, Integer retryCount, Long retryInterval);
+
+    /**
+     * 使用Cron表达式注册TubaTask类型任务（带配置）
+     * 
+     * @param tubaTask      TubaTask任务实例
+     * @param cron          Cron表达式
+     * @param timeout       超时时间（毫秒）
+     * @param retryCount    重试次数
+     * @param retryInterval 重试间隔（毫秒）
+     * @return 注册成功的任务ID
+     */
+    String registerTask(TubaTask tubaTask, String cron,
+            Long timeout, Integer retryCount, Long retryInterval);
 }

@@ -14,7 +14,7 @@
         <module>scheduler-plugins</module>
         <module>scheduler-spring-boot-starter</module>
 <!--   示例项目    -->
-<!--        <module>scheduler-samples</module>-->
+        <module>scheduler-samples</module>
     </modules>
 
     <properties>

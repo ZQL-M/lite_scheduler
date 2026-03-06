@@ -32,6 +32,11 @@ lite-scheduler:
     pool-size: 10
     scheduler-pool-size: 5
     thread-name-prefix: lite-scheduler-
+    task-timeout: 60000
+    shutdown-timeout-seconds: 30
+    force-shutdown-timeout-seconds: 10
+    default-retry-count: 0
+    default-retry-interval: 1000
   persistence:
     type: database  # database 或 memory
   recovery:

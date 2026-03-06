@@ -110,14 +110,14 @@ public class TaskAdapter {
     }
 
     /**
-     * 创建Task类型的TaskDefinition
+     * 创建TubaTask类型的TaskDefinition
      * 
-     * @param tubaTask Task实例
+     * @param tubaTask TubaTask实例
      * @return TaskDefinition
      */
     public TaskDefinition createTaskDefinition(TubaTask tubaTask) {
         if (tubaTask == null) {
-            throw new IllegalArgumentException("Task cannot be null");
+            throw new IllegalArgumentException("TubaTask cannot be null");
         }
 
         TaskDefinition definition = new TaskDefinition();
@@ -126,7 +126,7 @@ public class TaskAdapter {
         // 处理lambda表达式，获取原始类名
         String className = getOriginalClassName(tubaTask);
         definition.setName(className);
-        definition.setDescription("Task");
+        definition.setDescription("TubaTask");
 
         return definition;
     }

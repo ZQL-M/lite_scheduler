@@ -95,7 +95,7 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
     /**
      * 注册Task类型任务
      *
-     * @param tubaTask       Task任务实例
+     * @param tubaTask   Task任务实例
      * @param definition 任务定义
      * @return 注册成功的任务ID
      */
@@ -129,7 +129,7 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
      * 使用Cron表达式注册Task类型任务
      *
      * @param tubaTask Task任务实例
-     * @param cron Cron表达式
+     * @param cron     Cron表达式
      * @return 注册成功的任务ID
      */
     @Override
@@ -146,7 +146,7 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
     /**
      * 使用固定频率注册Task类型任务
      *
-     * @param tubaTask     Task任务实例
+     * @param tubaTask Task任务实例
      * @param interval 时间间隔
      * @param timeUnit 时间单位
      * @return 注册成功的任务ID
@@ -532,7 +532,7 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
     /**
      * 参数验证：Task类型
      *
-     * @param tubaTask       Task任务实例
+     * @param tubaTask   Task任务实例
      * @param definition 任务定义
      * @throws IllegalArgumentException 如果参数无效
      */
@@ -639,6 +639,47 @@ public class TaskSchedulerServiceImpl implements TaskSchedulerService {
             throw new IllegalArgumentException("Task not found with ID: " + taskId);
         }
         return definition;
+    }
+
+    @Override
+    public String registerTask(TubaTask tubaTask, TaskDefinition definition,
+            Long timeout, Integer retryCount, Long retryInterval) {
+        // 设置用户配置
+        if (timeout != null) {
+            definition.setTimeout(timeout);
+        }
+        if (retryCount != null) {
+            definition.setRetryCount(retryCount);
+        }
+        if (retryInterval != null) {
+            definition.setRetryInterval(retryInterval);
+        }
+        // 调用原有方法
+        return registerTask(tubaTask, definition);
+    }
+
+    @Override
+    public String registerTask(TubaTask tubaTask, String cron,
+            Long timeout, Integer retryCount, Long retryInterval) {
+        validateCron(cron);
+
+        TaskDefinition definition = taskAdapter.createTaskDefinition(tubaTask);
+
+        // 设置用户配置
+        if (timeout != null) {
+            definition.setTimeout(timeout);
+        }
+        if (retryCount != null) {
+            definition.setRetryCount(retryCount);
+        }
+        if (retryInterval != null) {
+            definition.setRetryInterval(retryInterval);
+        }
+
+        String taskId = registerTask(tubaTask, definition);
+        // 调度任务
+        scheduler.schedule(definition);
+        return taskId;
     }
 
 }

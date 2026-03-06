@@ -43,6 +43,21 @@ public class TaskDefinition {
     @TableField("updated_time")
     private LocalDateTime updatedTime; // 更新时间
 
+    /**
+     * 任务执行超时时间（毫秒）
+     */
+    private Long timeout;
+
+    /**
+     * 任务失败重试次数
+     */
+    private Integer retryCount;
+
+    /**
+     * 任务失败重试间隔（毫秒）
+     */
+    private Long retryInterval;
+
     public TaskDefinition(String id, String name, String groupName, String jobClass, String description) {
         this.id = id;
         this.name = name;
