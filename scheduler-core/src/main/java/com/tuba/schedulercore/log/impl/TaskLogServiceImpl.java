@@ -4,6 +4,7 @@ import com.tuba.schedulercore.log.TaskLogService;
 import com.tuba.schedulercore.mapper.TaskLogMapper;
 import com.tuba.schedulercore.model.TaskContext;
 import com.tuba.schedulercore.model.TaskLog;
+import com.tuba.schedulercore.enums.ExecutionStatus;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -22,9 +23,8 @@ public class TaskLogServiceImpl implements TaskLogService {
     public TaskLog recordTaskStart(TaskContext context) {
         TaskLog log = new TaskLog();
         log.setTaskId(context.getDefinition().getId());
-        log.setTaskName(context.getDefinition().getName());
         log.setStartTime(java.time.LocalDateTime.now());
-        log.setStatus("RUNNING");
+        log.setStatus(ExecutionStatus.RUNNING);
         taskLogMapper.insert(log);
         return log;
     }
@@ -33,7 +33,7 @@ public class TaskLogServiceImpl implements TaskLogService {
     public void recordTaskSuccess(TaskContext context, TaskLog log) {
         log.setEndTime(java.time.LocalDateTime.now());
         log.setDurationMs(calculateDuration(log.getStartTime(), log.getEndTime()));
-        log.setStatus("SUCCESS");
+        log.setStatus(ExecutionStatus.SUCCESS);
         taskLogMapper.updateById(log);
     }
 
@@ -41,9 +41,8 @@ public class TaskLogServiceImpl implements TaskLogService {
     public void recordTaskFailure(TaskContext context, TaskLog log, Throwable error) {
         log.setEndTime(java.time.LocalDateTime.now());
         log.setDurationMs(calculateDuration(log.getStartTime(), log.getEndTime()));
-        log.setStatus("FAIL");
+        log.setStatus(ExecutionStatus.FAILURE);
         log.setErrorMessage(error.getMessage());
-        log.setException(getExceptionStackTrace(error));
         taskLogMapper.updateById(log);
     }
 
@@ -57,12 +56,5 @@ public class TaskLogServiceImpl implements TaskLogService {
             return java.time.Duration.between(startTime, endTime).toMillis();
         }
         return 0;
-    }
-
-    private String getExceptionStackTrace(Throwable error) {
-        java.io.StringWriter sw = new java.io.StringWriter();
-        java.io.PrintWriter pw = new java.io.PrintWriter(sw);
-        error.printStackTrace(pw);
-        return sw.toString();
     }
 }

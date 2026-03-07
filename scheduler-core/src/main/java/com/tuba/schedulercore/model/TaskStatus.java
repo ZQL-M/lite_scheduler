@@ -8,6 +8,9 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
+import com.tuba.schedulercore.enums.TaskLifecycleState;
+import com.tuba.schedulercore.enums.ExecutionStatus;
+
 /**
  * 任务状态，存储任务的实时执行状态和统计信息
  */
@@ -16,9 +19,10 @@ import java.time.LocalDateTime;
 @TableName("task_status")
 public class TaskStatus {
     @TableId("task_id")
-    private String taskId; // 关联的任务ID
+    private String taskId; // 关联的任务 ID
 
-    private String state = "WAITING"; // 任务状态
+    @TableField("state")
+    private TaskLifecycleState state = TaskLifecycleState.WAITING; // 任务生命周期状态
 
     @TableField("last_fire_time")
     private LocalDateTime lastFireTime; // 上次触发时间
@@ -27,10 +31,10 @@ public class TaskStatus {
     private LocalDateTime nextFireTime; // 下次触发时间
 
     @TableField("last_execution_id")
-    private String lastExecutionId; // 上次执行记录ID
+    private String lastExecutionId; // 上次执行记录 ID
 
     @TableField("last_execution_status")
-    private String lastExecutionStatus = "NONE"; // 上次执行状态
+    private ExecutionStatus lastExecutionStatus = null; // 上次执行状态
 
     @TableField("consecutive_failures")
     private int consecutiveFailures = 0; // 连续失败次数
@@ -50,8 +54,8 @@ public class TaskStatus {
     // 构造方法
     public TaskStatus(String taskId) {
         this.taskId = taskId;
-        this.state = "WAITING";
-        this.lastExecutionStatus = "NONE";
+        this.state = TaskLifecycleState.WAITING;
+        this.lastExecutionStatus = null;
         this.consecutiveFailures = 0;
         this.totalExecutions = 0;
         this.totalSuccesses = 0;
@@ -62,7 +66,7 @@ public class TaskStatus {
     // 业务方法
     public void recordSuccess(String executionId) {
         this.lastExecutionId = executionId;
-        this.lastExecutionStatus = "SUCCESS";
+        this.lastExecutionStatus = ExecutionStatus.SUCCESS;
         this.lastFireTime = LocalDateTime.now();
         this.consecutiveFailures = 0;
         this.totalExecutions++;
@@ -72,7 +76,7 @@ public class TaskStatus {
 
     public void recordFailure(String executionId) {
         this.lastExecutionId = executionId;
-        this.lastExecutionStatus = "FAILURE";
+        this.lastExecutionStatus = ExecutionStatus.FAILURE;
         this.lastFireTime = LocalDateTime.now();
         this.consecutiveFailures++;
         this.totalExecutions++;

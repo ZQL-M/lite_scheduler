@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 
 import java.time.LocalDateTime;
 
+import com.tuba.schedulercore.enums.ExecutionStatus;
 import lombok.Data;
 
 /**
@@ -21,11 +22,8 @@ public class TaskLog {
     @TableField("task_id")
     private String taskId;
 
-    @TableField("task_name")
-    private String taskName;
-
     @TableField("trigger_id")
-    private String triggerId; // 触发本次执行的触发器ID
+    private String triggerId; // 触发本次执行的触发器 ID
 
     @TableField("start_time")
     private LocalDateTime startTime;
@@ -36,12 +34,11 @@ public class TaskLog {
     @TableField("duration_ms")
     private Long durationMs;
 
-    private String status;
+    @TableField("status")
+    private ExecutionStatus status;
 
     @TableField("error_message")
     private String errorMessage;
-
-    private String exception;
 
     private boolean deleted = false; // 是否软删除
 

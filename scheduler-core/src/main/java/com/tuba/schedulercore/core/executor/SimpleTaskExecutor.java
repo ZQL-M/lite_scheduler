@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 /**
+ * todo 需要资源隔离，可以实现执行器工厂模式
  * 简单执行器：支持同步或使用线程池异步执行。
  */
 @Component
