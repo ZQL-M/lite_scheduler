@@ -3,6 +3,7 @@ package com.tuba.schedulercore.core.task;
 import com.tuba.schedulercore.model.TaskContext;
 
 /**
+ * todo 完善接口
  * 任务接口，用户可实现此接口定义自定义任务逻辑
  */
 public interface TubaTask {

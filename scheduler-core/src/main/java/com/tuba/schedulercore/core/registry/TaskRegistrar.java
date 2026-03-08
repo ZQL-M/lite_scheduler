@@ -2,10 +2,9 @@ package com.tuba.schedulercore.core.registry;
 
 import com.tuba.schedulercore.annotation.TubaTask;
 import com.tuba.schedulercore.config.properties.PersistenceProperties;
+import com.tuba.schedulercore.core.store.JobStore;
 import com.tuba.schedulercore.model.TaskDefinition;
-import com.tuba.schedulercore.core.persistence.TaskPersistenceService;
 import com.tuba.schedulercore.core.scheduler.Scheduler;
-import com.tuba.schedulercore.service.TaskSchedulerService;
 import com.tuba.schedulercore.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,18 +34,16 @@ public class TaskRegistrar implements ApplicationContextAware {
     private ApplicationContext applicationContext;
     private final Scheduler scheduler;
     private final PersistenceProperties persistenceProperties;
-    private final TaskSchedulerService taskSchedulerService;
+    private final JobStore jobStore;
     private final TaskRegistry taskRegistry;
-    private final TaskPersistenceService persistenceService;
 
     public TaskRegistrar(Scheduler scheduler,
-            PersistenceProperties persistenceProperties, TaskSchedulerService taskSchedulerService,
-            TaskRegistry taskRegistry, TaskPersistenceService persistenceService) {
+            PersistenceProperties persistenceProperties, JobStore jobStore,
+            TaskRegistry taskRegistry) {
         this.scheduler = scheduler;
         this.persistenceProperties = persistenceProperties;
-        this.taskSchedulerService = taskSchedulerService;
+        this.jobStore = jobStore;
         this.taskRegistry = taskRegistry;
-        this.persistenceService = persistenceService;
     }
 
     @EventListener(ContextRefreshedEvent.class)
@@ -128,13 +125,14 @@ public class TaskRegistrar implements ApplicationContextAware {
             def.setEnabled(true); // 默认启用
             // 根据配置自动设置持久化属性，覆盖注解默认值
             boolean isDatabasePersistence = "database".equalsIgnoreCase(persistenceProperties.getType());
-            def.setPersistent(isDatabasePersistence || ann.persistent()); // 数据库模式下默认为true，否则使用注解值
+            def.setPersistent(isDatabasePersistence || ann.persistent()); // 数据库模式下默认为 true，否则使用注解值
 
             // 解析时间配置
             parseTimeConfiguration(ann, def);
 
-            // 使用TaskSchedulerService注册任务，这样才能触发持久化逻辑
-            taskSchedulerService.registerTask(def);
+            // 存储任务定义到 JobStore
+            jobStore.storeTaskDefinition(def, true);
+            log.info("Registered task: {} (ID: {})", def.getName(), def.getId());
         } catch (Exception e) {
             log.error("Failed to register method {}: {}", method.getName(), e.getMessage(), e);
         }
@@ -185,10 +183,10 @@ public class TaskRegistrar implements ApplicationContextAware {
             }
         }
 
-        // 2. 检查数据库（如果持久化服务可用）
-        if (persistenceService.isAvailable()) {
+        // 2. 检查数据库（如果 JobStore 可用）
+        if (jobStore.isAvailable()) {
             try {
-                List<TaskDefinition> dbTasks = persistenceService.findAll();
+                List<TaskDefinition> dbTasks = jobStore.retrieveEnabledTasks();
                 for (TaskDefinition dbTask : dbTasks) {
                     if (dbTask.getName().equals(taskName) &&
                             dbTask.getGroupName().equals(groupName)) {

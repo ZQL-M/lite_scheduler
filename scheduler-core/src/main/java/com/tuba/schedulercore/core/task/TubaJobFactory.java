@@ -3,6 +3,7 @@ package com.tuba.schedulercore.core.task;
 import com.tuba.schedulercore.model.TaskDefinition;
 
 /**
+ * todo 完善接口
  * TubaJobFactory接口，用于创建任务实例
  * 解耦任务创建与框架核心逻辑，支持无状态任务
  */

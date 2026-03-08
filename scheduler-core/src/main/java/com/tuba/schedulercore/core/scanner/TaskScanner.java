@@ -1,8 +1,8 @@
 package com.tuba.schedulercore.core.scanner;
 
 import com.tuba.schedulercore.config.properties.ScannerProperties;
+import com.tuba.schedulercore.core.store.JobStore;
 import com.tuba.schedulercore.model.TaskDefinition;
-import com.tuba.schedulercore.core.persistence.TaskPersistenceService;
 import com.tuba.schedulercore.core.registry.TaskRegistry;
 import com.tuba.schedulercore.core.scheduler.Scheduler;
 import com.tuba.schedulercore.core.task.TubaJobFactory;
@@ -32,7 +32,7 @@ public class TaskScanner implements DisposableBean {
     private ApplicationContext applicationContext;
 
     @Autowired
-    private TaskPersistenceService persistenceService;
+    private JobStore jobStore;
 
     @Autowired
     private TaskRegistry taskRegistry;
@@ -77,8 +77,8 @@ public class TaskScanner implements DisposableBean {
      */
     private void scanTasks() {
         try {
-            // 从数据库加载所有已启用的任务
-            List<TaskDefinition> tasks = persistenceService.findEnabledTasks();
+            // 从 JobStore 加载所有已启用的任务
+            List<TaskDefinition> tasks = jobStore.retrieveEnabledTasks();
 
             int loadedCount = 0;
             for (TaskDefinition task : tasks) {
@@ -88,12 +88,9 @@ public class TaskScanner implements DisposableBean {
                     if (TaskUtils.validateTaskClass(task)) {
                         // 注册任务到注册表
                         taskRegistry.register(task);
-                        // 调度任务
-                        scheduler.schedule(task);
-                        // 标记为已加载
-                        loadedTasks.put(task.getId(), true);
-                        loadedCount++;
-                        log.info("成功加载任务: {} (ID: {})",
+                        // 调度任务（从 JobStore 获取触发器）
+                        scheduler.start();
+                        log.info("成功加载任务：{} (ID: {})",
                                 task.getName(), task.getId());
                     } else {
                         log.error("加载任务失败: {} (ID: {}) - 任务类验证失败",
